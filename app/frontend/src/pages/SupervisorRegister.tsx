@@ -13,6 +13,61 @@ import {
 } from '@mui/material';
 import { Work } from '@mui/icons-material';
 
+// ==================== VALIDATION UTILITIES ====================
+
+const validateEmail = (email: string): { valid: boolean; error?: string } => {
+  const pattern = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+  if (!pattern.test(email)) {
+    return { valid: false, error: 'Invalid email format' };
+  }
+  return { valid: true };
+};
+
+const validatePassword = (password: string): { valid: boolean; errors: string[] } => {
+  const errors: string[] = [];
+  
+  if (password.length < 8) {
+    errors.push('Password must be at least 8 characters long');
+  }
+  if (!/[A-Z]/.test(password)) {
+    errors.push('Password must contain at least one uppercase letter');
+  }
+  if (!/[a-z]/.test(password)) {
+    errors.push('Password must contain at least one lowercase letter');
+  }
+  if (!/\d/.test(password)) {
+    errors.push('Password must contain at least one digit');
+  }
+  
+  return { valid: errors.length === 0, errors };
+};
+
+const validateName = (name: string): { valid: boolean; error?: string } => {
+  if (!name || name.trim().length === 0) {
+    return { valid: false, error: 'Name cannot be empty' };
+  }
+  if (name.length > 120) {
+    return { valid: false, error: 'Name cannot exceed 120 characters' };
+  }
+  if (!/^[a-zA-Z\s\-']+$/.test(name)) {
+    return { valid: false, error: 'Name can only contain letters, spaces, hyphens, and apostrophes' };
+  }
+  return { valid: true };
+};
+
+const validatePhone = (phone: string): { valid: boolean; error?: string } => {
+  if (!phone || phone.trim().length === 0) {
+    return { valid: true }; // Optional field
+  }
+  if (!/^[\d\s\-\+\(\)]{10,}$/.test(phone)) {
+    return { valid: false, error: 'Invalid phone number format' };
+  }
+  if (phone.length > 20) {
+    return { valid: false, error: 'Phone number cannot exceed 20 characters' };
+  }
+  return { valid: true };
+};
+
 export const SupervisorRegister = () => {
   const [formData, setFormData] = useState({
     name: '',
@@ -22,7 +77,8 @@ export const SupervisorRegister = () => {
     department: '',
     phone: '',
   });
-  const [error, setError] = useState('');
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [generalError, setGeneralError] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
@@ -32,14 +88,65 @@ export const SupervisorRegister = () => {
       ...prev,
       [name]: value,
     }));
+    // Clear error for this field when user starts typing
+    if (errors[name]) {
+      setErrors(prev => ({
+        ...prev,
+        [name]: '',
+      }));
+    }
+  };
+
+  const validateForm = (): boolean => {
+    const newErrors: Record<string, string> = {};
+    let isValid = true;
+
+    // Validate name
+    const nameValidation = validateName(formData.name);
+    if (!nameValidation.valid) {
+      newErrors['name'] = nameValidation.error || '';
+      isValid = false;
+    }
+
+    // Validate email
+    const emailValidation = validateEmail(formData.email);
+    if (!emailValidation.valid) {
+      newErrors['email'] = emailValidation.error || '';
+      isValid = false;
+    }
+
+    // Validate password
+    const passwordValidation = validatePassword(formData.password);
+    if (!passwordValidation.valid) {
+      newErrors['password'] = passwordValidation.errors.join(', ');
+      isValid = false;
+    }
+
+    // Validate password match
+    if (formData.password !== formData.confirmPassword) {
+      newErrors['confirmPassword'] = 'Passwords do not match';
+      isValid = false;
+    }
+
+    // Validate phone (optional but if provided, must be valid)
+    if (formData.phone) {
+      const phoneValidation = validatePhone(formData.phone);
+      if (!phoneValidation.valid) {
+        newErrors['phone'] = phoneValidation.error || '';
+        isValid = false;
+      }
+    }
+
+    setErrors(newErrors);
+    return isValid;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
+    setGeneralError('');
 
-    if (formData.password !== formData.confirmPassword) {
-      setError('Passwords do not match');
+    // Validate form before submitting
+    if (!validateForm()) {
       return;
     }
 
@@ -52,12 +159,12 @@ export const SupervisorRegister = () => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          name: formData.name,
-          email: formData.email,
+          name: formData.name.trim(),
+          email: formData.email.trim(),
           password: formData.password,
           role: 'supervisor',
-          department: formData.department,
-          phone: formData.phone,
+          department: formData.department.trim(),
+          phone: formData.phone.trim(),
         }),
       });
 
@@ -74,7 +181,7 @@ export const SupervisorRegister = () => {
 
       navigate('/login');
     } catch (err: any) {
-      setError(err.message || 'Registration failed. Please try again.');
+      setGeneralError(err.message || 'Registration failed. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -146,6 +253,8 @@ export const SupervisorRegister = () => {
                   required
                   disabled={loading}
                   variant="outlined"
+                  error={!!errors['name']}
+                  helperText={errors['name']}
                 />
 
                 <TextField
@@ -159,6 +268,8 @@ export const SupervisorRegister = () => {
                   required
                   disabled={loading}
                   variant="outlined"
+                  error={!!errors['email']}
+                  helperText={errors['email']}
                 />
 
                 <TextField
@@ -182,6 +293,8 @@ export const SupervisorRegister = () => {
                   fullWidth
                   disabled={loading}
                   variant="outlined"
+                  error={!!errors['phone']}
+                  helperText={errors['phone']}
                 />
 
                 <TextField
@@ -195,6 +308,8 @@ export const SupervisorRegister = () => {
                   required
                   disabled={loading}
                   variant="outlined"
+                  error={!!errors['password']}
+                  helperText={errors['password']}
                 />
 
                 <TextField
@@ -208,10 +323,12 @@ export const SupervisorRegister = () => {
                   required
                   disabled={loading}
                   variant="outlined"
+                  error={!!errors['confirmPassword']}
+                  helperText={errors['confirmPassword']}
                 />
 
-                {error && (
-                  <Alert severity="error">{error}</Alert>
+                {generalError && (
+                  <Alert severity="error">{generalError}</Alert>
                 )}
 
                 <Button
