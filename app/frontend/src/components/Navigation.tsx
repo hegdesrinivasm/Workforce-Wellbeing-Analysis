@@ -19,7 +19,6 @@ import {
   Close as CloseIcon,
   Dashboard as DashboardIcon,
   People as PeopleIcon,
-  Settings as SettingsIcon,
   Logout as LogoutIcon,
 } from '@mui/icons-material'
 import { useAuth } from '../context/AuthContext'
@@ -46,8 +45,6 @@ export default function Navigation() {
     if (user?.role === 'supervisor') {
       baseItems.push({ label: 'Team Members', icon: <PeopleIcon />, path: '/employees' })
     }
-    
-    baseItems.push({ label: 'Settings', icon: <SettingsIcon />, path: '/settings' })
     
     return baseItems
   }
