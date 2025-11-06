@@ -100,8 +100,18 @@ class SlackAPI:
     
     async def get_user_info(self) -> Dict:
         """Get authenticated user information"""
-        data = await self._make_request("users.identity")
-        return data.get("user", {})
+        try:
+            # For bot tokens, get auth.test to identify the bot/user
+            data = await self._make_request("auth.test")
+            return {
+                "id": data.get("user_id"),
+                "team_id": data.get("team_id"),
+                "team": data.get("team"),
+                "user": data.get("user")
+            }
+        except Exception as e:
+            logger.error(f"Error getting user info: {e}")
+            raise
     
     async def get_conversations_list(self, types: str = "public_channel,private_channel") -> List[Dict]:
         """
@@ -185,8 +195,10 @@ class SlackAPI:
         channels = await self.get_conversations_list()
         
         all_user_messages = []
-        user_info = await self.get_user_info()
-        user_id = user_info.get("id")
+        
+        # Get the bot's user_id from auth.test
+        auth_data = await self._make_request("auth.test")
+        user_id = auth_data.get("user_id")
         
         # Limit channels to process
         for channel in channels[:channel_limit]:

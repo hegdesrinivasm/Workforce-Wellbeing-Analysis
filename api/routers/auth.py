@@ -13,6 +13,7 @@ from database import get_db, User, OAuthToken
 from config import settings
 from integrations.microsoft_graph import MicrosoftGraphOAuth
 from integrations.slack import SlackOAuth
+from integrations.jira import JiraOAuth
 from utils.encryption import encrypt_token, decrypt_token
 
 logger = logging.getLogger(__name__)
@@ -173,6 +174,35 @@ async def refresh_token(
                 status_code=400,
                 detail="Slack tokens do not expire. If invalid, please reconnect."
             )
+        
+        elif provider == "jira":
+            # Refresh Jira token
+            jira_oauth = JiraOAuth(
+                client_id=settings.JIRA_CLIENT_ID,
+                client_secret=settings.JIRA_CLIENT_SECRET,
+                redirect_uri=settings.JIRA_REDIRECT_URI,
+                scopes=["read:jira-user", "read:jira-work", "offline_access"]
+            )
+            
+            refresh_token = decrypt_token(token_record.refresh_token)
+            new_token = await jira_oauth.refresh_access_token(refresh_token)
+            
+            # Update token in database
+            token_record.access_token = encrypt_token(new_token["access_token"])
+            if "refresh_token" in new_token:
+                token_record.refresh_token = encrypt_token(new_token["refresh_token"])
+            
+            expires_in = new_token.get("expires_in", 3600)
+            token_record.expires_at = datetime.utcnow() + timedelta(seconds=expires_in)
+            token_record.updated_at = datetime.utcnow()
+            
+            db.commit()
+            
+            return {
+                "status": "success",
+                "provider": provider,
+                "expires_at": token_record.expires_at.isoformat()
+            }
         
         else:
             raise HTTPException(status_code=400, detail=f"Unsupported provider: {provider}")
@@ -349,4 +379,131 @@ async def slack_callback(
     
     except Exception as e:
         logger.error(f"Error in Slack OAuth callback: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# Jira OAuth2
+@router.get("/jira/login")
+async def jira_login(user_id: str, db: Session = Depends(get_db)):
+    """
+    Initiate Jira OAuth2 flow
+    """
+    try:
+        # Generate state for CSRF protection
+        state = secrets.token_urlsafe(32)
+        oauth_states[state] = {
+            "user_id": user_id,
+            "provider": "jira",
+            "created_at": datetime.utcnow()
+        }
+        
+        # Initialize Jira OAuth
+        jira_oauth = JiraOAuth(
+            client_id=settings.JIRA_CLIENT_ID,
+            client_secret=settings.JIRA_CLIENT_SECRET,
+            redirect_uri=settings.JIRA_REDIRECT_URI,
+            scopes=["read:jira-user", "read:jira-work", "offline_access"]
+        )
+        auth_url = jira_oauth.get_authorization_url(state)
+        
+        logger.info(f"Redirecting user {user_id} to Jira login")
+        return RedirectResponse(url=auth_url)
+    
+    except Exception as e:
+        logger.error(f"Error initiating Jira OAuth: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/jira/callback")
+async def jira_callback(
+    code: str,
+    state: str,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """
+    Handle Jira OAuth2 callback
+    Exchange code for tokens and store securely
+    """
+    try:
+        # Validate state
+        if state not in oauth_states:
+            raise HTTPException(status_code=400, detail="Invalid state parameter")
+        
+        state_data = oauth_states.pop(state)
+        user_id = state_data["user_id"]
+        
+        # Exchange code for tokens
+        jira_oauth = JiraOAuth(
+            client_id=settings.JIRA_CLIENT_ID,
+            client_secret=settings.JIRA_CLIENT_SECRET,
+            redirect_uri=settings.JIRA_REDIRECT_URI,
+            scopes=["read:jira-user", "read:jira-work", "offline_access"]
+        )
+        token_response = await jira_oauth.exchange_code_for_token(code)
+        
+        # Get accessible resources (Jira sites)
+        access_token = token_response["access_token"]
+        resources = await jira_oauth.get_accessible_resources(access_token)
+        
+        if not resources:
+            raise HTTPException(status_code=400, detail="No Jira sites accessible")
+        
+        # Use the first accessible resource (or let user choose in production)
+        cloud_id = resources[0]["id"]
+        cloud_url = resources[0]["url"]
+        
+        # Encrypt tokens before storage
+        encrypted_access_token = encrypt_token(token_response["access_token"])
+        encrypted_refresh_token = encrypt_token(token_response.get("refresh_token", ""))
+        
+        # Calculate expiration
+        expires_in = token_response.get("expires_in", 3600)
+        expires_at = datetime.utcnow() + timedelta(seconds=expires_in)
+        
+        # Store cloud_id and site info in metadata
+        metadata = {
+            "cloud_id": cloud_id,
+            "cloud_url": cloud_url,
+            "site_name": resources[0].get("name"),
+            "scopes": token_response.get("scope", "").split()
+        }
+        
+        # Check if token already exists
+        existing_token = db.query(OAuthToken).filter(
+            OAuthToken.user_id == user_id,
+            OAuthToken.provider == "jira"
+        ).first()
+        
+        if existing_token:
+            # Update existing token
+            existing_token.access_token = encrypted_access_token
+            existing_token.refresh_token = encrypted_refresh_token
+            existing_token.expires_at = expires_at
+            existing_token.scopes = token_response.get("scope", "").split()
+            existing_token.metadata = metadata
+            existing_token.updated_at = datetime.utcnow()
+        else:
+            # Create new token entry
+            new_token = OAuthToken(
+                user_id=user_id,
+                provider="jira",
+                access_token=encrypted_access_token,
+                refresh_token=encrypted_refresh_token,
+                expires_at=expires_at,
+                scopes=token_response.get("scope", "").split(),
+                metadata=metadata
+            )
+            db.add(new_token)
+        
+        db.commit()
+        
+        logger.info(f"Successfully stored Jira tokens for user {user_id}")
+        
+        # Redirect to frontend success page
+        frontend_url = settings.CORS_ORIGINS[0]
+        return RedirectResponse(url=f"{frontend_url}/integrations/success?provider=jira")
+    
+    except Exception as e:
+        logger.error(f"Error in Jira OAuth callback: {e}")
         raise HTTPException(status_code=500, detail=str(e))

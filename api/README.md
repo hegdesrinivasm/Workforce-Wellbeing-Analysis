@@ -29,6 +29,20 @@ OAuth2-based integration platform for workplace productivity and wellbeing analy
   - Activity statistics
   - Channel participation
   - After-hours messaging patterns
+
+- **Jira OAuth2 Flow**
+  - Authorization URL generation
+  - Code exchange for tokens
+  - Token refresh mechanism
+  - Accessible resources detection
+  - Secure encrypted storage
+  
+- **Jira Data Fetching**
+  - User issues (assigned/created)
+  - Worklog time tracking
+  - Issue statistics
+  - Context switching metrics
+  - Priority/status distribution
   
 - **Database Models**
   - Users
@@ -38,7 +52,6 @@ OAuth2-based integration platform for workplace productivity and wellbeing analy
   - Wellbeing scores
 
 ### Coming Soon
-- Jira integration
 - HRIS integration
 - Survey platforms (Typeform/Qualtrics)
 - Feature extraction pipeline
@@ -63,7 +76,8 @@ api/
 │
 ├── integrations/
 │   ├── microsoft_graph.py # Microsoft 365 integration
-│   └── slack.py          # Slack integration
+│   ├── slack.py          # Slack integration
+│   └── jira.py           # Jira integration
 │
 └── utils/
     └── encryption.py      # Token encryption utilities
@@ -75,6 +89,8 @@ api/
 - Python 3.11+
 - PostgreSQL
 - Microsoft Azure App Registration (for Microsoft Graph)
+- Slack App (for Slack API)
+- Jira Cloud App (for Jira API)
 
 ### 1. Install Dependencies
 
@@ -204,13 +220,21 @@ GET /auth/slack/login?user_id={user_id}
 ```
 Redirects to Slack authorization page.
 
+### Jira Authentication
+
+#### Initiate Jira OAuth
+```http
+GET /auth/jira/login?user_id={user_id}
+```
+Redirects to Jira authorization page.
+
 ### Universal Endpoints
 
 #### Check Auth Status (All Providers)
 ```http
 GET /auth/status/{user_id}
 ```
-Shows all connected providers (Microsoft, Slack, etc.)
+Shows all connected providers (Microsoft, Slack, Jira, etc.)
 
 #### Disconnect Any Provider
 ```http
@@ -285,6 +309,43 @@ Response:
       "unique_channels": 12,
       "after_hours_ratio": 0.23,
       "avg_messages_per_day": 32
+    }
+  }
+}
+```
+
+#### Fetch Jira Data
+```http
+POST /data/jira/fetch
+{
+  "user_id": "123",
+  "data_types": ["issues", "worklogs", "stats"],
+  "days_back": 14
+}
+```
+
+Response:
+```json
+{
+  "status": "success",
+  "user_id": "123",
+  "provider": "jira",
+  "results": {
+    "issues": {
+      "count": 23,
+      "issues": [...]
+    },
+    "worklogs": {
+      "count": 45,
+      "worklogs": [...]
+    },
+    "stats": {
+      "total_assigned_issues": 23,
+      "total_resolved_issues": 18,
+      "resolution_rate": 0.78,
+      "total_time_logged_hours": 72.5,
+      "context_switching_score": 4,
+      "unique_projects": 4
     }
   }
 }
@@ -436,19 +497,26 @@ created_at
 - Response patterns
 - Unique channels active in
 
+### From Jira
+- Issues assigned per week
+- Issue resolution rate
+- Time logged per day
+- Context switching score (project count)
+- Priority distribution
+- Worklog patterns by weekday
+- Average time per issue
+
 ### Coming Soon
-- **Jira**: Task completion times, context switching
 - **HRIS**: Attendance, overtime, leave patterns
 - **Surveys**: Self-reported stress, sentiment analysis
 
 ## Next Steps
 
-1. **Add Jira integration**: Task tracking and workload
-2. **Add HRIS integration**: Attendance and shift data
-3. **Feature extraction pipeline**: Automated ML feature computation
-4. **Background jobs**: Celery tasks for periodic fetching
-5. **ML models**: Burnout prediction, stress scoring
-6. **Frontend**: React dashboard for visualizations
+1. **HRIS integration**: Attendance and shift data
+2. **Feature extraction pipeline**: Automated ML feature computation
+3. **Background jobs**: Celery tasks for periodic fetching
+4. **ML models**: Burnout prediction, stress scoring
+5. **Frontend**: React dashboard for visualizations
 
 ## Troubleshooting
 

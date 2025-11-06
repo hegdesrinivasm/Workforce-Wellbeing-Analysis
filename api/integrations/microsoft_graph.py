@@ -188,10 +188,19 @@ class MicrosoftGraphAPI:
     async def get_teams_messages(
         self,
         start_date: datetime,
-        end_date: datetime
+        end_date: datetime,
+        include_content: bool = True
     ) -> List[Dict]:
         """
-        Fetch Teams chat activity
+        Fetch Teams chat activity with message content for sentiment analysis
+        
+        Args:
+            start_date: Start date for message retrieval
+            end_date: End date for message retrieval
+            include_content: Include message body content (for sentiment analysis)
+        
+        Returns:
+            List of messages with metadata and content
         """
         try:
             # Get user's chats
@@ -209,10 +218,26 @@ class MicrosoftGraphAPI:
                 # Get messages from each chat
                 for chat in chats[:50]:  # Limit to recent chats
                     chat_id = chat["id"]
+                    
+                    # Build select fields based on privacy requirements
+                    select_fields = [
+                        "id",
+                        "createdDateTime",
+                        "lastModifiedDateTime",
+                        "from",
+                        "messageType",
+                        "importance",
+                        "replyToId"
+                    ]
+                    
+                    if include_content:
+                        select_fields.append("body")  # Include message content for sentiment
+                    
                     messages_response = await client.get(
                         f"{self.base_url}/chats/{chat_id}/messages",
                         headers=self.headers,
                         params={
+                            "$select": ",".join(select_fields),
                             "$top": 100,
                             "$orderby": "createdDateTime desc"
                         }
@@ -220,12 +245,114 @@ class MicrosoftGraphAPI:
                     
                     if messages_response.status_code == 200:
                         messages = messages_response.json().get("value", [])
-                        all_messages.extend(messages)
+                        
+                        # Filter by date range
+                        filtered_messages = []
+                        for msg in messages:
+                            created = datetime.fromisoformat(msg.get("createdDateTime", "").replace("Z", "+00:00"))
+                            if start_date <= created <= end_date:
+                                # Add chat context
+                                msg["chat_id"] = chat_id
+                                msg["chat_type"] = chat.get("chatType")
+                                filtered_messages.append(msg)
+                        
+                        all_messages.extend(filtered_messages)
                 
                 return all_messages
         
         except Exception as e:
             logger.error(f"Error fetching Teams messages: {e}")
+            raise
+    
+    async def get_teams_channels_messages(
+        self,
+        start_date: datetime,
+        end_date: datetime,
+        include_content: bool = True
+    ) -> List[Dict]:
+        """
+        Fetch Teams channel messages (from teams the user is part of)
+        Requires ChannelMessage.Read.All permission
+        
+        Args:
+            start_date: Start date for message retrieval
+            end_date: End date for message retrieval
+            include_content: Include message body content (for sentiment analysis)
+        
+        Returns:
+            List of channel messages with metadata and content
+        """
+        try:
+            all_messages = []
+            
+            async with httpx.AsyncClient() as client:
+                # Get teams user is member of
+                teams_response = await client.get(
+                    f"{self.base_url}/me/joinedTeams",
+                    headers=self.headers
+                )
+                teams_response.raise_for_status()
+                teams = teams_response.json().get("value", [])
+                
+                # Get channels from each team
+                for team in teams[:10]:  # Limit teams
+                    team_id = team["id"]
+                    
+                    # Get channels in team
+                    channels_response = await client.get(
+                        f"{self.base_url}/teams/{team_id}/channels",
+                        headers=self.headers
+                    )
+                    
+                    if channels_response.status_code == 200:
+                        channels = channels_response.json().get("value", [])
+                        
+                        # Get messages from each channel
+                        for channel in channels[:20]:  # Limit channels per team
+                            channel_id = channel["id"]
+                            
+                            # Build delta query for date range
+                            select_fields = [
+                                "id",
+                                "createdDateTime",
+                                "lastModifiedDateTime",
+                                "from",
+                                "messageType",
+                                "importance",
+                                "replyToId"
+                            ]
+                            
+                            if include_content:
+                                select_fields.append("body")
+                            
+                            messages_response = await client.get(
+                                f"{self.base_url}/teams/{team_id}/channels/{channel_id}/messages",
+                                headers=self.headers,
+                                params={
+                                    "$select": ",".join(select_fields),
+                                    "$top": 50
+                                }
+                            )
+                            
+                            if messages_response.status_code == 200:
+                                messages = messages_response.json().get("value", [])
+                                
+                                # Filter by date and add context
+                                for msg in messages:
+                                    created_str = msg.get("createdDateTime", "")
+                                    if created_str:
+                                        created = datetime.fromisoformat(created_str.replace("Z", "+00:00"))
+                                        if start_date <= created <= end_date:
+                                            msg["team_id"] = team_id
+                                            msg["team_name"] = team.get("displayName")
+                                            msg["channel_id"] = channel_id
+                                            msg["channel_name"] = channel.get("displayName")
+                                            all_messages.append(msg)
+                
+                return all_messages
+        
+        except Exception as e:
+            logger.error(f"Error fetching Teams channel messages: {e}")
             raise
     
     async def get_presence(self) -> Dict:

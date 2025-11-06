@@ -12,6 +12,7 @@ from database import get_db, OAuthToken, DataFetch
 from config import settings
 from integrations.microsoft_graph import MicrosoftGraphAPI
 from integrations.slack import SlackAPI
+from integrations.jira import JiraAPI
 from utils.encryption import decrypt_token
 
 logger = logging.getLogger(__name__)
@@ -355,4 +356,167 @@ async def fetch_slack_data(
         raise
     except Exception as e:
         logger.error(f"Error fetching Slack data: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/jira/fetch")
+async def fetch_jira_data(
+    user_id: str,
+    data_types: list[str],  # ["issues", "worklogs", "stats"]
+    days_back: int = 14,
+    background_tasks: BackgroundTasks = None,
+    db: Session = Depends(get_db)
+):
+    """
+    Fetch Jira data for a user
+    Data types: issues, worklogs, stats
+    """
+    try:
+        # Get valid token
+        access_token = await get_valid_token(user_id, "jira", db)
+        
+        # Get cloud_id from token metadata
+        token_record = db.query(OAuthToken).filter(
+            OAuthToken.user_id == user_id,
+            OAuthToken.provider == "jira"
+        ).first()
+        
+        cloud_id = token_record.metadata.get("cloud_id")
+        if not cloud_id:
+            raise HTTPException(status_code=400, detail="No Jira cloud_id found in token metadata")
+        
+        # Initialize Jira API
+        jira_api = JiraAPI(access_token, cloud_id)
+        
+        # Get current user account_id
+        user_info = await jira_api.get_current_user()
+        account_id = user_info["account_id"]
+        
+        # Calculate date range
+        end_date = datetime.utcnow()
+        start_date = end_date - timedelta(days=days_back)
+        
+        results = {}
+        
+        # Fetch issues
+        if "issues" in data_types:
+            logger.info(f"Fetching Jira issues for user {user_id}")
+            
+            fetch_record = DataFetch(
+                user_id=user_id,
+                provider="jira",
+                data_type="issues",
+                fetch_start=start_date,
+                fetch_end=end_date,
+                status="in_progress"
+            )
+            db.add(fetch_record)
+            db.commit()
+            
+            try:
+                issues = await jira_api.get_user_issues(
+                    account_id,
+                    start_date,
+                    end_date,
+                    max_results=500
+                )
+                results["issues"] = {
+                    "count": len(issues),
+                    "issues": issues
+                }
+                
+                fetch_record.status = "success"
+                fetch_record.records_fetched = len(issues)
+                db.commit()
+                
+            except Exception as e:
+                fetch_record.status = "failed"
+                fetch_record.error_message = str(e)
+                db.commit()
+                raise
+        
+        # Fetch worklogs
+        if "worklogs" in data_types:
+            logger.info(f"Fetching Jira worklogs for user {user_id}")
+            
+            fetch_record = DataFetch(
+                user_id=user_id,
+                provider="jira",
+                data_type="worklogs",
+                fetch_start=start_date,
+                fetch_end=end_date,
+                status="in_progress"
+            )
+            db.add(fetch_record)
+            db.commit()
+            
+            try:
+                worklogs = await jira_api.get_user_worklogs(
+                    account_id,
+                    start_date,
+                    end_date
+                )
+                results["worklogs"] = {
+                    "count": len(worklogs),
+                    "worklogs": worklogs
+                }
+                
+                fetch_record.status = "success"
+                fetch_record.records_fetched = len(worklogs)
+                db.commit()
+                
+            except Exception as e:
+                fetch_record.status = "failed"
+                fetch_record.error_message = str(e)
+                db.commit()
+                raise
+        
+        # Fetch statistics
+        if "stats" in data_types:
+            logger.info(f"Fetching Jira stats for user {user_id}")
+            
+            fetch_record = DataFetch(
+                user_id=user_id,
+                provider="jira",
+                data_type="stats",
+                fetch_start=start_date,
+                fetch_end=end_date,
+                status="in_progress"
+            )
+            db.add(fetch_record)
+            db.commit()
+            
+            try:
+                stats = await jira_api.get_user_stats(
+                    account_id,
+                    start_date,
+                    end_date
+                )
+                results["stats"] = stats
+                
+                fetch_record.status = "success"
+                fetch_record.records_fetched = 1
+                db.commit()
+                
+            except Exception as e:
+                fetch_record.status = "failed"
+                fetch_record.error_message = str(e)
+                db.commit()
+                raise
+        
+        return {
+            "status": "success",
+            "user_id": user_id,
+            "provider": "jira",
+            "date_range": {
+                "start": start_date.isoformat(),
+                "end": end_date.isoformat()
+            },
+            "results": results
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching Jira data: {e}")
         raise HTTPException(status_code=500, detail=str(e))
