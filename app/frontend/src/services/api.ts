@@ -4,7 +4,7 @@
  */
 
 // Use environment variable or default to production URL
-const API_BASE_URL = (import.meta as any).env?.VITE_API_URL || 'https://ai-based-workforce-productivity-wel-livid.vercel.app/api';
+const API_BASE_URL = (import.meta as any).env?.VITE_API_URL || 'https://ai-based-workforce-productivity-wel.vercel.app/api';
 
 interface ApiResponse<T> {
   data?: T;

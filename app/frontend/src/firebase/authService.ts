@@ -1,13 +1,9 @@
-import {
-  signInWithEmailAndPassword,
-  createUserWithEmailAndPassword,
-  signOut,
-  type User
-} from 'firebase/auth';
+import type { User } from '@firebase/auth-types';
 import { auth } from './config';
 
 export const loginWithEmail = async (email: string, password: string) => {
   try {
+    const { signInWithEmailAndPassword } = await import('firebase/auth');
     const userCredential = await signInWithEmailAndPassword(auth, email, password);
     return userCredential.user;
   } catch (error: any) {
@@ -17,6 +13,7 @@ export const loginWithEmail = async (email: string, password: string) => {
 
 export const registerWithEmail = async (email: string, password: string) => {
   try {
+    const { createUserWithEmailAndPassword } = await import('firebase/auth');
     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
     return userCredential.user;
   } catch (error: any) {
@@ -26,6 +23,7 @@ export const registerWithEmail = async (email: string, password: string) => {
 
 export const logoutUser = async () => {
   try {
+    const { signOut } = await import('firebase/auth');
     await signOut(auth);
   } catch (error: any) {
     throw new Error(error.message || 'Logout failed');
@@ -35,5 +33,3 @@ export const logoutUser = async () => {
 export const getCurrentUser = (): User | null => {
   return auth.currentUser;
 };
-
-export type { User };

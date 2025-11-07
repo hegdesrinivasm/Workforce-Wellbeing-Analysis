@@ -62,7 +62,21 @@ def validate_string_field(value, field_name, max_length=120, required=False):
     return True, None
 
 app = Flask(__name__)
-CORS(app)
+
+# Configure CORS to allow Vercel domain and localhost
+CORS(app, resources={
+    r"/*": {
+        "origins": [
+            "http://localhost:5173",
+            "http://localhost:3000",
+            "https://ai-based-workforce-productivity-wel.vercel.app",
+            "https://*.vercel.app"
+        ],
+        "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        "allow_headers": ["Content-Type", "Authorization"],
+        "supports_credentials": True
+    }
+})
 
 # Ensure all responses are JSON
 @app.before_request
