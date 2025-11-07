@@ -5,7 +5,7 @@
       "src": "app/frontend/package.json",
       "use": "@vercel/static-build",
       "config": {
-        "distDir": "app/frontend/dist"
+        "distDir": "dist"
       }
     },
     {
@@ -20,6 +20,22 @@
     },
     {
       "src": "/auth/(.*)",
+      "dest": "api/main.py"
+    },
+    {
+      "src": "/data/(.*)",
+      "dest": "api/main.py"
+    },
+    {
+      "src": "/users/(.*)",
+      "dest": "api/main.py"
+    },
+    {
+      "src": "/features/(.*)",
+      "dest": "api/main.py"
+    },
+    {
+      "src": "/dashboard/(.*)",
       "dest": "api/main.py"
     },
     {
