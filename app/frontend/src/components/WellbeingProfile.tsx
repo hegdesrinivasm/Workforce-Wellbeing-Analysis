@@ -296,33 +296,6 @@ export const WellbeingProfile = () => {
               description: 'Meetings attended',
             },
             {
-              title: 'Messages Sent',
-              value: messagesSent,
-              unit: 'msgs/week',
-              icon: <Chat />,
-              color: '#388e3c',
-              bgColor: '#e8f5e9',
-              description: 'Messages sent',
-            },
-            {
-              title: 'Messages Received',
-              value: messagesReceived,
-              unit: 'msgs/week',
-              icon: <Chat />,
-              color: '#388e3c',
-              bgColor: '#e8f5e9',
-              description: 'Messages received',
-            },
-            {
-              title: 'Task Completion',
-              value: taskCompletionRate,
-              unit: '%',
-              icon: <Assignment />,
-              color: taskCompletionRate >= 80 ? '#388e3c' : taskCompletionRate >= 60 ? '#f57c00' : '#d32f2f',
-              bgColor: taskCompletionRate >= 80 ? '#e8f5e9' : taskCompletionRate >= 60 ? '#fff3e0' : '#ffebee',
-              description: 'Completion rate',
-            },
-            {
               title: 'Logged Hours',
               value: loggedHours,
               unit: 'hrs/week',
@@ -528,64 +501,7 @@ export const WellbeingProfile = () => {
           </Card>
       </Box>
 
-      {/* Insights */}
-      <Box sx={{ mt: 3 }}>
-        <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>
-          Key Insights
-        </Typography>
-        <Box
-          sx={{
-            display: 'grid',
-            gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', md: 'repeat(3, 1fr)' },
-            gap: 3,
-          }}
-        >
-            <Paper
-              sx={{
-                p: 2,
-                borderLeft: '4px solid #4caf50',
-                bgcolor: '#e8f5e9',
-              }}
-            >
-              <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
-                Strong Performance
-              </Typography>
-              <Typography variant="caption" sx={{ color: '#616161' }}>
-                92% task completion rate shows excellent productivity
-              </Typography>
-            </Paper>
 
-            <Paper
-              sx={{
-                p: 2,
-                borderLeft: '4px solid #1976d2',
-                bgcolor: '#e3f2fd',
-              }}
-            >
-              <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
-                Meeting Load
-              </Typography>
-              <Typography variant="caption" sx={{ color: '#616161' }}>
-                32% of time in meetings - consider batching for deep work
-              </Typography>
-            </Paper>
-
-            <Paper
-              sx={{
-                p: 2,
-                borderLeft: '4px solid #ff9800',
-                bgcolor: '#fff3e0',
-              }}
-            >
-              <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
-                Communicative
-              </Typography>
-              <Typography variant="caption" sx={{ color: '#7f8c8d' }}>
-          245 messages sent - actively engaging with your team
-        </Typography>
-      </Paper>
-    </Box>
-  </Box>
 </Box>
   );
 };

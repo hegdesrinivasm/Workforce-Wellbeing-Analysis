@@ -284,9 +284,9 @@ export const TeamOverview = ({ onViewMember }: TeamOverviewProps) => {
 
   const exhaustedMembers = teamMembers.filter(m => m.isExhausted).length;
   const highStressMembers = teamMembers.filter(m => m.stressLevel === 'high').length;
-  const avgTaskCompletion = Math.round(
-    teamMembers.reduce((sum, m) => sum + m.taskCompletionRate, 0) / teamMembers.length
-  );
+  const avgTaskCompletion = teamMembers.length > 0 
+    ? Math.round(teamMembers.reduce((sum, m) => sum + m.taskCompletionRate, 0) / teamMembers.length)
+    : 0;
 
   return (
     <Box sx={{ width: '100%', p: 3 }}>
@@ -455,12 +455,14 @@ export const TeamOverview = ({ onViewMember }: TeamOverviewProps) => {
           return (
             <Paper
               key={member.id}
+              onClick={() => onViewMember(member.firebaseId)}
               sx={{
                 p: 3,
                 borderRadius: 2,
                 boxShadow: 2,
                 transition: 'all 0.3s ease',
                 borderLeft: `4px solid ${member.isExhausted ? '#a93226' : '#1e7e45'}`,
+                cursor: 'pointer',
                 '&:hover': {
                   boxShadow: 4,
                   transform: 'translateY(-2px)',
@@ -705,25 +707,6 @@ export const TeamOverview = ({ onViewMember }: TeamOverviewProps) => {
                       />
                     </Box>
                   </Box>
-                </Box>
-
-                {/* Action Button */}
-                <Box>
-                  <Tooltip title="View Details">
-                    <IconButton
-                      onClick={() => onViewMember(member.firebaseId)}
-                      sx={{
-                        bgcolor: '#3498db15',
-                        color: '#3498db',
-                        '&:hover': {
-                          bgcolor: '#3498db',
-                          color: 'white',
-                        },
-                      }}
-                    >
-                      <RemoveRedEye />
-                    </IconButton>
-                  </Tooltip>
                 </Box>
               </Box>
             </Paper>
