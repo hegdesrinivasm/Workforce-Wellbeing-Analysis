@@ -133,6 +133,26 @@ export const MemberDashboard = () => {
                 vertical: 'top',
                 horizontal: 'right',
               }}
+              TransitionProps={{
+                timeout: 300,
+              }}
+              slotProps={{
+                paper: {
+                  sx: {
+                    animation: 'fadeSlideIn 0.3s ease-out',
+                    '@keyframes fadeSlideIn': {
+                      '0%': {
+                        opacity: 0,
+                        transform: 'translateY(-10px)',
+                      },
+                      '100%': {
+                        opacity: 1,
+                        transform: 'translateY(0)',
+                      },
+                    },
+                  },
+                },
+              }}
             >
               <MenuItem onClick={handleAccountClick}>
                 <AccountCircle sx={{ mr: 1, fontSize: 20 }} />
