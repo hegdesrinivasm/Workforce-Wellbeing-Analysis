@@ -4,8 +4,8 @@ import {
   CardContent,
   Typography,
   Avatar,
-  LinearProgress,
   Paper,
+  CircularProgress,
 } from '@mui/material';
 import {
   VideoCall,
@@ -17,69 +17,215 @@ import {
   Login,
   Logout,
 } from '@mui/icons-material';
+import { useAuth } from '../context/AuthContext';
+import { BurnoutAlerts } from './BurnoutAlerts';
+
+interface UserAnalytics {
+  taskCompletionRate?: number;
+  loggedHours?: number;
+  wellbeingScore?: number;
+  meetingHours?: number;
+  meetingCount?: number;
+  messagesSent?: number;
+  messagesReceived?: number;
+  earlyStarts?: number;
+  lateExits?: number;
+  lateStarts?: number;
+  earlyExits?: number;
+  burnoutRisk?: number;
+  efficiency?: number;
+  stressLevel?: 'low' | 'medium' | 'high';
+  trend?: 'up' | 'down' | 'stable';
+  lastActive?: string;
+}
 
 export const WellbeingProfile = () => {
+  const { user } = useAuth();
+  
+  // Generate consistent dummy values based on email hash (same as TeamOverview)
+  const generateConsistentValue = (email: string, seed: number, min: number, max: number): number => {
+    let hash = 0;
+    const str = email + seed.toString();
+    for (let i = 0; i < str.length; i++) {
+      hash = ((hash << 5) - hash) + str.charCodeAt(i);
+      hash = hash & hash;
+    }
+    return min + (Math.abs(hash) % (max - min + 1));
+  };
+
+  const email = user?.email || '';
+  
+  // TODO: Fetch real analytics data from Firestore
+  // For now, use consistent dummy values based on email
+  const getUserAnalytics = (): UserAnalytics | null => {
+    // In the future, this would fetch from Firestore: doc(db, 'analytics', user.id)
+    // For now, return null to use dummy values
+    return null;
+  };
+  
+  const analytics = getUserAnalytics();
+  
+  // Use real data if available, otherwise generate consistent dummy values
+  const taskCompletionRate = analytics?.taskCompletionRate ?? generateConsistentValue(email, 1, 60, 100);
+  const loggedHours = analytics?.loggedHours ?? generateConsistentValue(email, 2, 30, 45);
+  const wellbeingScore = analytics?.wellbeingScore ?? generateConsistentValue(email, 3, 50, 90);
+  const meetingHours = analytics?.meetingHours ?? generateConsistentValue(email, 5, 8, 18);
+  const meetingCount = analytics?.meetingCount ?? generateConsistentValue(email, 6, 12, 25);
+  const messagesSent = analytics?.messagesSent ?? generateConsistentValue(email, 7, 150, 300);
+  const messagesReceived = analytics?.messagesReceived ?? generateConsistentValue(email, 8, 120, 250);
+  const earlyStarts = analytics?.earlyStarts ?? generateConsistentValue(email, 9, 0, 4);
+  const lateExits = analytics?.lateExits ?? generateConsistentValue(email, 10, 0, 3);
+  const lateStarts = analytics?.lateStarts ?? generateConsistentValue(email, 11, 0, 2);
+  const earlyExits = analytics?.earlyExits ?? generateConsistentValue(email, 12, 0, 1);
+  
+  // Calculate burnout risk and efficiency based on other metrics
+  // const burnoutRisk = analytics?.burnoutRisk ?? Math.min(100, Math.max(0, 100 - wellbeingScore + (meetingHours > 15 ? 20 : 0)));
+  const burnoutRisk = 100;
+  const efficiency = analytics?.efficiency ?? Math.round((taskCompletionRate + Math.min(100, (loggedHours / 40) * 100)) / 2);
+
   return (
     <Box sx={{ maxWidth: 1400, mx: 'auto', p: 3 }}>
-      {/* PRODUCTIVITY METRICS SECTION */}
-      <Typography variant="h4" sx={{ fontWeight: 700, mb: 4 }}>
-        Productivity Dashboard
-      </Typography>
-
-      {/* Efficiency Score Card */}
-      <Card
+      {/* Score Cards - Square boxes with circular progress */}
+      <Box
         sx={{
-          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-          color: 'white',
+          display: 'grid',
+          gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', md: '1fr 1fr 1fr' },
+          gap: 3,
           mb: 4,
-          boxShadow: 3,
         }}
       >
+        {/* Wellbeing Score Card */}
+        <Card sx={{ boxShadow: 3, borderRadius: 2 }}>
           <CardContent sx={{ p: 3 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-              <Box
-                sx={{
-                  width: 100,
-                  height: 100,
-                  borderRadius: '50%',
-                  bgcolor: 'rgba(255, 255, 255, 0.2)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  flexShrink: 0,
-                }}
-              >
-                <Box sx={{ textAlign: 'center' }}>
-                  <Typography variant="h3" sx={{ fontWeight: 700 }}>
-                    {Math.round((92 + Math.max(0, 100 - 18 * 3) + Math.min(100, (38.5 / 40) * 100)) / 3)}
-                  </Typography>
-                  <Typography variant="caption">/100</Typography>
-                </Box>
-              </Box>
-              <Box sx={{ flex: 1 }}>
-                <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>
-                  Overall Efficiency Score
-                </Typography>
-                <Typography variant="body2" sx={{ opacity: 0.9, mb: 2 }}>
-                  Based on task completion, meeting time, and logged hours
-                </Typography>
-                <LinearProgress
+            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+              <Box sx={{ position: 'relative', display: 'inline-flex', mb: 2 }}>
+                <CircularProgress
                   variant="determinate"
-                  value={75}
+                  value={wellbeingScore}
+                  size={120}
+                  thickness={4}
                   sx={{
-                    height: 8,
-                    borderRadius: 4,
-                    bgcolor: 'rgba(255, 255, 255, 0.2)',
-                    '& .MuiLinearProgress-bar': {
-                      bgcolor: 'white',
-                      borderRadius: 4,
+                    color: '#f093fb',
+                    '& .MuiCircularProgress-circle': {
+                      strokeLinecap: 'round',
                     },
                   }}
                 />
+                <Box
+                  sx={{
+                    top: 0,
+                    left: 0,
+                    bottom: 0,
+                    right: 0,
+                    position: 'absolute',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                                    <Typography variant="h4" sx={{ fontWeight: 700, color: '#f093fb' }}>
+                    {wellbeingScore}
+                  </Typography>
+                </Box>
               </Box>
+              <Typography variant="h6" sx={{ fontWeight: 700, mb: 1, textAlign: 'center' }}>
+                Wellbeing Score
+              </Typography>
+              <Typography variant="body2" sx={{ color: 'text.secondary', textAlign: 'center' }}>
+                Overall wellness based on workload, stress indicators, and work-life balance
+              </Typography>
             </Box>
           </CardContent>
-      </Card>
+        </Card>
+
+        {/* Burnout Risk Score Card */}
+        <Card sx={{ boxShadow: 3, borderRadius: 2 }}>
+          <CardContent sx={{ p: 3 }}>
+            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+              <Box sx={{ position: 'relative', display: 'inline-flex', mb: 2 }}>
+                <CircularProgress
+                  variant="determinate"
+                  value={burnoutRisk}
+                  size={120}
+                  thickness={4}
+                  sx={{
+                    color: '#fa709a',
+                    '& .MuiCircularProgress-circle': {
+                      strokeLinecap: 'round',
+                    },
+                  }}
+                />
+                <Box
+                  sx={{
+                    top: 0,
+                    left: 0,
+                    bottom: 0,
+                    right: 0,
+                    position: 'absolute',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Typography variant="h4" sx={{ fontWeight: 700, color: '#fa709a' }}>
+                    {burnoutRisk}
+                  </Typography>
+                </Box>
+              </Box>
+              <Typography variant="h6" sx={{ fontWeight: 700, mb: 1, textAlign: 'center' }}>
+                Burnout Risk Score
+              </Typography>
+              <Typography variant="body2" sx={{ color: 'text.secondary', textAlign: 'center' }}>
+                {burnoutRisk < 40 ? 'Low risk - Your current workload and stress levels are manageable' : burnoutRisk < 70 ? 'Moderate risk - Consider balancing your workload' : 'High risk - Please take care of your wellbeing'}
+              </Typography>
+            </Box>
+          </CardContent>
+        </Card>
+
+        {/* Efficiency Score Card */}
+        <Card sx={{ boxShadow: 3, borderRadius: 2 }}>
+          <CardContent sx={{ p: 3 }}>
+            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+              <Box sx={{ position: 'relative', display: 'inline-flex', mb: 2 }}>
+                <CircularProgress
+                  variant="determinate"
+                  value={efficiency}
+                  size={120}
+                  thickness={4}
+                  sx={{
+                    color: '#667eea',
+                    '& .MuiCircularProgress-circle': {
+                      strokeLinecap: 'round',
+                    },
+                  }}
+                />
+                <Box
+                  sx={{
+                    top: 0,
+                    left: 0,
+                    bottom: 0,
+                    right: 0,
+                    position: 'absolute',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Typography variant="h4" sx={{ fontWeight: 700, color: '#667eea' }}>
+                    {efficiency}
+                  </Typography>
+                </Box>
+              </Box>
+              <Typography variant="h6" sx={{ fontWeight: 700, mb: 1, textAlign: 'center' }}>
+                Overall Efficiency Score
+              </Typography>
+              <Typography variant="body2" sx={{ color: 'text.secondary', textAlign: 'center' }}>
+                Based on task completion and logged hours
+              </Typography>
+            </Box>
+          </CardContent>
+        </Card>
+      </Box>
 
       {/* Productivity Metrics Grid */}
       <Typography variant="h6" sx={{ fontWeight: 700, mb: 3 }}>
@@ -96,7 +242,7 @@ export const WellbeingProfile = () => {
           {[
             {
               title: 'Meeting Hours',
-              value: 12.5,
+              value: meetingHours,
               unit: 'hrs/week',
               icon: <VideoCall />,
               color: '#3498db',
@@ -105,7 +251,7 @@ export const WellbeingProfile = () => {
             },
             {
               title: 'Meeting Count',
-              value: 18,
+              value: meetingCount,
               unit: 'meetings/week',
               icon: <VideoCall />,
               color: '#e74c3c',
@@ -114,7 +260,7 @@ export const WellbeingProfile = () => {
             },
             {
               title: 'Messages Sent',
-              value: 245,
+              value: messagesSent,
               unit: 'msgs/week',
               icon: <Chat />,
               color: '#2ecc71',
@@ -123,7 +269,7 @@ export const WellbeingProfile = () => {
             },
             {
               title: 'Messages Received',
-              value: 187,
+              value: messagesReceived,
               unit: 'msgs/week',
               icon: <Chat />,
               color: '#f39c12',
@@ -132,7 +278,7 @@ export const WellbeingProfile = () => {
             },
             {
               title: 'Task Completion',
-              value: 92,
+              value: taskCompletionRate,
               unit: '%',
               icon: <Assignment />,
               color: '#9b59b6',
@@ -141,7 +287,7 @@ export const WellbeingProfile = () => {
             },
             {
               title: 'Logged Hours',
-              value: 38.5,
+              value: loggedHours,
               unit: 'hrs/week',
               icon: <AccessTime />,
               color: '#1abc9c',
@@ -150,7 +296,7 @@ export const WellbeingProfile = () => {
             },
             {
               title: 'Early Starts',
-              value: 3,
+              value: earlyStarts,
               unit: 'days/week',
               icon: <Login />,
               color: '#27ae60',
@@ -159,7 +305,7 @@ export const WellbeingProfile = () => {
             },
             {
               title: 'Late Exits',
-              value: 2,
+              value: lateExits,
               unit: 'days/week',
               icon: <Logout />,
               color: '#16a085',
@@ -168,7 +314,7 @@ export const WellbeingProfile = () => {
             },
             {
               title: 'Late Starts',
-              value: 1,
+              value: lateStarts,
               unit: 'days/week',
               icon: <TrendingUp />,
               color: '#e67e22',
@@ -177,12 +323,21 @@ export const WellbeingProfile = () => {
             },
             {
               title: 'Early Exits',
-              value: 0,
+              value: earlyExits,
               unit: 'days/week',
               icon: <Speed />,
               color: '#c0392b',
               bgColor: '#c0392b15',
               description: 'Left early',
+            },
+            {
+              title: 'Performance Score',
+              value: 85,
+              unit: '/100',
+              icon: <TrendingUp />,
+              color: '#8e44ad',
+              bgColor: '#8e44ad15',
+              description: 'Overall performance',
             },
           ].map((metric, index) => (
             <Paper
@@ -399,6 +554,11 @@ export const WellbeingProfile = () => {
           245 messages sent - actively engaging with your team
         </Typography>
       </Paper>
+    </Box>
+
+    {/* Burnout Alerts Section */}
+    <Box sx={{ mt: 4 }}>
+      <BurnoutAlerts />
     </Box>
   </Box>
 </Box>

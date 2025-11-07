@@ -12,6 +12,9 @@ import {
   Stack,
 } from '@mui/material';
 import { Work } from '@mui/icons-material';
+import { registerWithEmail } from '../firebase/auth';
+import { doc, setDoc } from 'firebase/firestore';
+import { db } from '../firebase/config';
 
 // ==================== VALIDATION UTILITIES ====================
 
@@ -40,8 +43,17 @@ const validateName = (name: string): { valid: boolean; error?: string } => {
   if (name.length > 120) {
     return { valid: false, error: 'Name cannot exceed 120 characters' };
   }
-  if (!/^[a-zA-Z\s\-']+$/.test(name)) {
-    return { valid: false, error: 'Name can only contain letters, spaces, hyphens, and apostrophes' };
+  // Must start with a letter
+  if (!/^[a-zA-Z]/.test(name)) {
+    return { valid: false, error: 'Name must start with a letter' };
+  }
+  // Can't be all numbers
+  if (/^\d+$/.test(name.trim())) {
+    return { valid: false, error: 'Name cannot be only numbers' };
+  }
+  // Can contain letters, numbers, spaces, hyphens, and apostrophes
+  if (!/^[a-zA-Z][a-zA-Z0-9\s\-']*$/.test(name)) {
+    return { valid: false, error: 'Name can only contain letters, numbers, spaces, hyphens, and apostrophes' };
   }
   return { valid: true };
 };
@@ -65,6 +77,7 @@ export const MemberRegister = () => {
     email: '',
     password: '',
     confirmPassword: '',
+    teamNumber: '',
     phone: '',
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -143,34 +156,35 @@ export const MemberRegister = () => {
     setLoading(true);
 
     try {
-      const response = await fetch('http://localhost:5000/api/register', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          name: formData.name.trim(),
-          email: formData.email.trim(),
-          password: formData.password,
-          role: 'member',
-          phone: formData.phone.trim(),
-        }),
+      // Register user with Firebase Authentication
+      const firebaseUser = await registerWithEmail(
+        formData.email.trim(),
+        formData.password
+      );
+
+      // Store additional user data in Firestore
+      await setDoc(doc(db, 'users', firebaseUser.uid), {
+        name: formData.name.trim(),
+        email: formData.email.trim(),
+        role: 'member',
+        teamNumber: formData.teamNumber.trim() || '1',
+        phone: formData.phone.trim(),
+        createdAt: new Date().toISOString(),
       });
 
-      let data;
-      try {
-        data = await response.json();
-      } catch (e) {
-        throw new Error('Server is not responding. Make sure backend is running on port 5000.');
-      }
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Registration failed');
-      }
-
+      // Registration successful, navigate to login
       navigate('/login');
     } catch (err: any) {
-      setGeneralError(err.message || 'Registration failed. Please try again.');
+      // Provide user-friendly error messages
+      if (err.message?.includes('auth/email-already-in-use')) {
+        setGeneralError('This email is already registered. Please login instead.');
+      } else if (err.message?.includes('auth/weak-password')) {
+        setGeneralError('Password is too weak. Please use a stronger password.');
+      } else if (err.message?.includes('auth/invalid-email')) {
+        setGeneralError('Invalid email address format.');
+      } else {
+        setGeneralError(err.message || 'Registration failed. Please try again.');
+      }
     } finally {
       setLoading(false);
     }
@@ -269,6 +283,17 @@ export const MemberRegister = () => {
                     variant="outlined"
                     error={!!errors['email']}
                     helperText={errors['email']}
+                  />
+
+                  <TextField
+                    label="Team Number"
+                    name="teamNumber"
+                    value={formData.teamNumber}
+                    onChange={handleChange}
+                    placeholder="e.g., 1, 2, 3, 4"
+                    fullWidth
+                    disabled={loading}
+                    variant="outlined"
                   />
 
                   <TextField

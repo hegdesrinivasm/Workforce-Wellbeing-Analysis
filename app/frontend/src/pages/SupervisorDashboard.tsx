@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { TeamOverview } from '../components/TeamOverview';
 import { SupervisorProfile } from '../components/SupervisorProfile';
 import { MemberDetail } from '../components/MemberDetail';
+import { NotificationBar } from '../components/NotificationBar';
 import {
   Box,
   AppBar,
@@ -14,8 +15,11 @@ import {
   MenuItem,
   Tabs,
   Tab,
+  Card,
+  CardContent,
+  Button,
 } from '@mui/material';
-import { Work, Logout, AccountCircle } from '@mui/icons-material';
+import { Work, Logout, AccountCircle, ArrowBack } from '@mui/icons-material';
 
 export const SupervisorDashboard = () => {
   const { user, logout } = useAuth();
@@ -23,6 +27,7 @@ export const SupervisorDashboard = () => {
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [tabValue, setTabValue] = useState(0);
   const [selectedMemberId, setSelectedMemberId] = useState<number | null>(null);
+  const [showAccount, setShowAccount] = useState(false);
 
   useEffect(() => {
     // Redirect to login if not authenticated
@@ -39,6 +44,11 @@ export const SupervisorDashboard = () => {
     setAnchorEl(null);
   };
 
+  const handleViewAccount = () => {
+    setShowAccount(true);
+    handleMenuClose();
+  };
+
   const handleLogout = () => {
     logout();
     navigate('/login');
@@ -46,6 +56,116 @@ export const SupervisorDashboard = () => {
 
   if (!user) {
     return null;
+  }
+
+  // Account Details View
+  if (showAccount) {
+    return (
+      <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh', bgcolor: '#fafafa' }}>
+        {/* Header */}
+        <AppBar position="static" sx={{ boxShadow: 2, background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>
+          <Toolbar>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flex: 1 }}>
+              <Box
+                sx={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: 40,
+                  height: 40,
+                  bgcolor: 'rgba(255, 255, 255, 0.1)',
+                  borderRadius: 1,
+                }}
+              >
+                <Work sx={{ color: 'white', fontSize: 24 }} />
+              </Box>
+              <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                Workforce Wellbeing - Supervisor
+              </Typography>
+            </Box>
+
+            {/* User Avatar */}
+            <Avatar
+              sx={{
+                width: 36,
+                height: 36,
+                bgcolor: 'rgba(255, 255, 255, 0.2)',
+              }}
+            >
+              {user.name.charAt(0).toUpperCase()}
+            </Avatar>
+          </Toolbar>
+        </AppBar>
+
+        {/* Account Details Content */}
+        <Box sx={{ flex: 1, overflow: 'auto', p: 3 }}>
+          <Box sx={{ maxWidth: 600, mx: 'auto' }}>
+            <Button
+              startIcon={<ArrowBack />}
+              onClick={() => setShowAccount(false)}
+              sx={{ mb: 3 }}
+            >
+              Back to Dashboard
+            </Button>
+
+            <Card sx={{ boxShadow: 3 }}>
+              <CardContent sx={{ p: 4 }}>
+                <Typography variant="h5" sx={{ fontWeight: 700, mb: 3 }}>
+                  Account Details
+                </Typography>
+
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                  <Box>
+                    <Typography variant="caption" sx={{ color: '#7f8c8d', textTransform: 'uppercase' }}>
+                      Name
+                    </Typography>
+                    <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                      {user.name}
+                    </Typography>
+                  </Box>
+
+                  <Box>
+                    <Typography variant="caption" sx={{ color: '#7f8c8d', textTransform: 'uppercase' }}>
+                      Email
+                    </Typography>
+                    <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                      {user.email}
+                    </Typography>
+                  </Box>
+
+                  <Box>
+                    <Typography variant="caption" sx={{ color: '#7f8c8d', textTransform: 'uppercase' }}>
+                      User ID
+                    </Typography>
+                    <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                      {user.id}
+                    </Typography>
+                  </Box>
+
+                  <Box>
+                    <Typography variant="caption" sx={{ color: '#7f8c8d', textTransform: 'uppercase' }}>
+                      Role
+                    </Typography>
+                    <Typography variant="body1" sx={{ fontWeight: 600, textTransform: 'capitalize' }}>
+                      {user.role}
+                    </Typography>
+                  </Box>
+
+                  <Box>
+                    <Typography variant="caption" sx={{ color: '#7f8c8d', textTransform: 'uppercase' }}>
+                      Team Number
+                    </Typography>
+                    <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                      {(user as any).teamNumber || '1'}
+                    </Typography>
+                  </Box>
+                </Box>
+              </CardContent>
+            </Card>
+          </Box>
+        </Box>
+      </Box>
+    );
   }
 
   return (
@@ -74,6 +194,8 @@ export const SupervisorDashboard = () => {
 
           {/* User Menu */}
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <NotificationBar />
+            
             <Avatar
               sx={{
                 width: 36,
@@ -98,14 +220,9 @@ export const SupervisorDashboard = () => {
                 horizontal: 'right',
               }}
             >
-              <MenuItem disabled>
+              <MenuItem onClick={handleViewAccount}>
                 <AccountCircle sx={{ mr: 1, fontSize: 20 }} />
-                <Typography variant="body2">{user.name}</Typography>
-              </MenuItem>
-              <MenuItem onClick={handleMenuClose} disabled>
-                <Typography variant="body2" color="textSecondary">
-                  Department: {(user as any).department || 'N/A'}
-                </Typography>
+                <Typography variant="body2">Account</Typography>
               </MenuItem>
               <MenuItem onClick={handleLogout}>
                 <Logout sx={{ mr: 1, fontSize: 20 }} />

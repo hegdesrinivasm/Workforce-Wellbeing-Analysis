@@ -1,3 +1,7 @@
+import { useState, useEffect } from 'react';
+import { collection, query, where, getDocs } from 'firebase/firestore';
+import { db } from '../firebase/config';
+import { useAuth } from '../context/AuthContext';
 import {
   Box,
   Card,
@@ -9,6 +13,7 @@ import {
   Paper,
   IconButton,
   Tooltip,
+  CircularProgress,
 } from '@mui/material';
 import {
   TrendingUp,
@@ -39,69 +44,117 @@ interface TeamOverviewProps {
 }
 
 export const TeamOverview = ({ onViewMember }: TeamOverviewProps) => {
-  // Mock data - in production, this would come from backend API
-  const teamMembers: TeamMember[] = [
-    {
-      id: 1,
-      name: 'Alice Johnson',
-      email: 'alice@company.com',
-      taskCompletionRate: 95,
-      loggedHours: 42,
-      wellbeingScore: 85,
-      isExhausted: false,
-      stressLevel: 'low',
-      trend: 'up',
-      lastActive: '2 hours ago',
-    },
-    {
-      id: 2,
-      name: 'Bob Smith',
-      email: 'bob@company.com',
-      taskCompletionRate: 78,
-      loggedHours: 38,
-      wellbeingScore: 72,
-      isExhausted: false,
-      stressLevel: 'medium',
-      trend: 'stable',
-      lastActive: '1 hour ago',
-    },
-    {
-      id: 3,
-      name: 'Carol Davis',
-      email: 'carol@company.com',
-      taskCompletionRate: 88,
-      loggedHours: 45,
-      wellbeingScore: 58,
-      isExhausted: true,
-      stressLevel: 'high',
-      trend: 'down',
-      lastActive: '30 minutes ago',
-    },
-    {
-      id: 4,
-      name: 'David Wilson',
-      email: 'david@company.com',
-      taskCompletionRate: 92,
-      loggedHours: 40,
-      wellbeingScore: 78,
-      isExhausted: false,
-      stressLevel: 'low',
-      trend: 'up',
-      lastActive: '15 minutes ago',
-    },
-    {
-      id: 5,
-      name: 'Emma Brown',
-      email: 'emma@company.com',
-      taskCompletionRate: 65,
-      loggedHours: 35,
-      wellbeingScore: 65,
-      isExhausted: true,
-      stressLevel: 'high',
-      trend: 'down',
-      lastActive: '4 hours ago',
-    },
-  ];
+  const { user } = useAuth();
+  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // Generate consistent dummy values based on email hash
+  const generateConsistentValue = (email: string, seed: number, min: number, max: number): number => {
+    let hash = 0;
+    const str = email + seed.toString();
+    for (let i = 0; i < str.length; i++) {
+      hash = ((hash << 5) - hash) + str.charCodeAt(i);
+      hash = hash & hash; // Convert to 32bit integer
+    }
+    return min + (Math.abs(hash) % (max - min + 1));
+  };
+
+  const getConsistentStressLevel = (email: string): 'low' | 'medium' | 'high' => {
+    const levels: ('low' | 'medium' | 'high')[] = ['low', 'medium', 'high'];
+    const index = generateConsistentValue(email, 999, 0, 2);
+    return levels[index];
+  };
+
+  const getConsistentTrend = (email: string): 'up' | 'down' | 'stable' => {
+    const trends: ('up' | 'down' | 'stable')[] = ['up', 'down', 'stable'];
+    const index = generateConsistentValue(email, 888, 0, 2);
+    return trends[index];
+  };
+
+  const getConsistentLastActive = (email: string): string => {
+    const times = ['Just now', '15 minutes ago', '1 hour ago', '2 hours ago'];
+    const index = generateConsistentValue(email, 777, 0, 3);
+    return times[index];
+  };
+
+  // Fetch team members from Firestore
+  useEffect(() => {
+    const fetchTeamMembers = async () => {
+      if (!user) return;
+
+      try {
+        setLoading(true);
+        const supervisorTeamNumber = (user as any).teamNumber || '1';
+        
+        // Query Firestore for members with matching team number
+        const membersRef = collection(db, 'users');
+        const q = query(
+          membersRef,
+          where('role', '==', 'member'),
+          where('teamNumber', '==', supervisorTeamNumber)
+        );
+        
+        const querySnapshot = await getDocs(q);
+        const members: TeamMember[] = [];
+        
+        querySnapshot.forEach((doc) => {
+          const data = doc.data();
+          const email = data.email || '';
+          
+          // Use real data if available, otherwise generate consistent dummy values
+          members.push({
+            id: members.length + 1,
+            name: data.name || 'Unknown',
+            email: email,
+            // Use real analytics if provided, fallback to consistent dummy values
+            taskCompletionRate: data.analytics?.taskCompletionRate ?? generateConsistentValue(email, 1, 60, 100),
+            loggedHours: data.analytics?.loggedHours ?? generateConsistentValue(email, 2, 30, 45),
+            wellbeingScore: data.analytics?.wellbeingScore ?? generateConsistentValue(email, 3, 50, 90),
+            isExhausted: data.analytics?.isExhausted ?? (generateConsistentValue(email, 4, 0, 100) < 30),
+            stressLevel: data.analytics?.stressLevel ?? getConsistentStressLevel(email),
+            trend: data.analytics?.trend ?? getConsistentTrend(email),
+            lastActive: data.analytics?.lastActive ?? getConsistentLastActive(email),
+          });
+        });
+        
+        setTeamMembers(members);
+      } catch (error) {
+        console.error('Error fetching team members:', error);
+        // Show empty array on error instead of mock data
+        setTeamMembers([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchTeamMembers();
+  }, [user]);
+
+  if (loading) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', p: 8 }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
+
+  if (teamMembers.length === 0) {
+    return (
+      <Box sx={{ maxWidth: 1400, mx: 'auto', p: 3 }}>
+        <Typography variant="h4" sx={{ fontWeight: 700, mb: 3 }}>
+          Team Overview
+        </Typography>
+        <Paper sx={{ p: 4, textAlign: 'center' }}>
+          <Typography variant="h6" sx={{ color: '#7f8c8d', mb: 1 }}>
+            No team members found
+          </Typography>
+          <Typography variant="body2" sx={{ color: '#95a5a6' }}>
+            There are no members assigned to team number {(user as any)?.teamNumber || '1'} yet.
+          </Typography>
+        </Paper>
+      </Box>
+    );
+  }
 
   const getStressColor = (level: string) => {
     switch (level) {

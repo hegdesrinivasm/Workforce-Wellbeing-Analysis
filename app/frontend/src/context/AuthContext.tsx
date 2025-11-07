@@ -1,4 +1,8 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { onAuthStateChanged } from 'firebase/auth';
+import { doc, getDoc } from 'firebase/firestore';
+import { auth, db } from '../firebase/config';
+import { loginWithEmail, logoutUser } from '../firebase/auth';
 
 export type UserRole = 'supervisor' | 'member';
 
@@ -23,7 +27,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Load user from localStorage on mount
+  // Load user from localStorage and listen to Firebase auth state
   useEffect(() => {
     try {
       const savedUser = localStorage.getItem('authUser');
@@ -36,47 +40,142 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } finally {
       setLoading(false);
     }
+
+    // Listen to Firebase auth state changes
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: any) => {
+      if (firebaseUser) {
+        // User is signed in with Firebase
+        const savedUser = localStorage.getItem('authUser');
+        if (!savedUser) {
+          // Fetch user details from Firestore
+          try {
+            const userDocRef = doc(db, 'users', firebaseUser.uid);
+            const userDoc = await getDoc(userDocRef);
+            
+            if (userDoc.exists()) {
+              const data = userDoc.data();
+              const userData = {
+                id: firebaseUser.uid,
+                email: data.email,
+                role: data.role as UserRole,
+                name: data.name,
+              };
+              setUser(userData);
+              localStorage.setItem('authUser', JSON.stringify(userData));
+            } else {
+              // User document doesn't exist in Firestore, use mock data
+              const mockUserData = {
+                id: firebaseUser.uid,
+                email: firebaseUser.email || '',
+                role: (firebaseUser.email === 'supervisor@test.com' ? 'supervisor' : 'member') as UserRole,
+                name: firebaseUser.email?.split('@')[0] || 'User',
+              };
+              setUser(mockUserData);
+              localStorage.setItem('authUser', JSON.stringify(mockUserData));
+            }
+          } catch (error) {
+            console.error('Error fetching user data:', error);
+          }
+        }
+      } else {
+        // User is signed out
+        setUser(null);
+        localStorage.removeItem('authUser');
+      }
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
   }, []);
 
   const login = async (email: string, password: string) => {
     setLoading(true);
     try {
-      const response = await fetch('http://localhost:5000/api/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
-      });
-
-      let data;
+      // Authenticate with Firebase
+      const firebaseUser = await loginWithEmail(email, password);
+      
+      // Get user details from Firestore
+      let userData;
       try {
-        data = await response.json();
-      } catch (e) {
-        throw new Error('Server is not responding. Make sure backend is running on port 5000.');
+        const userDocRef = doc(db, 'users', firebaseUser.uid);
+        const userDoc = await getDoc(userDocRef);
+        
+        if (userDoc.exists()) {
+          const data = userDoc.data();
+          userData = {
+            id: firebaseUser.uid,
+            email: data.email,
+            role: data.role as UserRole,
+            name: data.name,
+          };
+        } else {
+          // User document doesn't exist in Firestore, use mock data based on email
+          console.warn('User document not found in Firestore, using mock data');
+          
+          if (email === 'supervisor@test.com') {
+            userData = {
+              id: firebaseUser.uid,
+              email: email,
+              role: 'supervisor' as UserRole,
+              name: 'Test Supervisor',
+            };
+          } else if (email === 'member@test.com') {
+            userData = {
+              id: firebaseUser.uid,
+              email: email,
+              role: 'member' as UserRole,
+              name: 'Test Member',
+            };
+          } else {
+            // Default to member role for unknown emails
+            userData = {
+              id: firebaseUser.uid,
+              email: email,
+              role: 'member' as UserRole,
+              name: email.split('@')[0] || 'User',
+            };
+          }
+        }
+      } catch (firestoreError) {
+        console.error('Error fetching from Firestore:', firestoreError);
+        // Fallback to mock data
+        userData = {
+          id: firebaseUser.uid,
+          email: email,
+          role: (email === 'supervisor@test.com' ? 'supervisor' : 'member') as UserRole,
+          name: email.split('@')[0] || 'User',
+        };
       }
 
-      if (!response.ok) {
-        throw new Error(data.error || 'Login failed');
-      }
-
-      const userData = {
-        id: data.id,
-        email: data.email,
-        role: data.role as UserRole,
-        name: data.name,
-      };
       setUser(userData);
       localStorage.setItem('authUser', JSON.stringify(userData));
-    } catch (error) {
+    } catch (error: any) {
       setLoading(false);
-      throw error;
+      // Provide user-friendly error messages
+      if (error.message?.includes('auth/wrong-password')) {
+        throw new Error('Incorrect password. Please try again.');
+      } else if (error.message?.includes('auth/user-not-found')) {
+        throw new Error('No account found with this email.');
+      } else if (error.message?.includes('auth/invalid-email')) {
+        throw new Error('Invalid email address.');
+      } else if (error.message?.includes('auth/configuration-not-found')) {
+        throw new Error('Firebase not configured. Please check .env file.');
+      } else {
+        throw new Error(error.message || 'Login failed. Please try again.');
+      }
     } finally {
       setLoading(false);
     }
   };
 
-  const logout = () => {
-    setUser(null);
-    localStorage.removeItem('authUser');
+  const logout = async () => {
+    try {
+      await logoutUser();
+      setUser(null);
+      localStorage.removeItem('authUser');
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
   };
 
   return (
