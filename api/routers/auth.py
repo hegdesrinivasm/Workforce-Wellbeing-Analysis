@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 # TEST MODE - Set to False for real OAuth, True for testing
-TEST_MODE = False
+TEST_MODE = True
 
 # OAuth state storage (use Redis in production)
 oauth_states = {}

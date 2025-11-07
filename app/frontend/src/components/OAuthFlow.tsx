@@ -92,7 +92,12 @@ export const OAuthFlow = ({ selectedServices, userId, onComplete }: OAuthFlowPro
     const service = serviceStatuses[index];
     
     // Prevent multiple authorization attempts
-    if (isAuthorizing) return;
+    if (isAuthorizing) {
+      console.log(`[OAuth] Already authorizing, skipping ${service.name}`);
+      return;
+    }
+    
+    console.log(`[OAuth] Starting authorization for ${service.name}`);
     setIsAuthorizing(true);
     
     // Update status to authorizing
@@ -104,10 +109,14 @@ export const OAuthFlow = ({ selectedServices, userId, onComplete }: OAuthFlowPro
     const oauthUrl = SERVICE_OAUTH_URLS[service.id];
     
     if (!oauthUrl) {
+      console.error(`[OAuth] No OAuth URL configured for ${service.name}`);
       handleServiceError(index, 'OAuth URL not configured');
       setIsAuthorizing(false);
       return;
     }
+
+    const fullUrl = `${oauthUrl}?user_id=${userId}&state=${service.id}`;
+    console.log(`[OAuth] Opening popup for ${service.name}:`, fullUrl);
 
     // Open OAuth popup
     const width = 600;
@@ -116,18 +125,32 @@ export const OAuthFlow = ({ selectedServices, userId, onComplete }: OAuthFlowPro
     const top = window.screen.height / 2 - height / 2;
 
     const popup = window.open(
-      `${oauthUrl}?user_id=${userId}&state=${service.id}`,
+      fullUrl,
       `oauth_${service.id}`,
       `width=${width},height=${height},left=${left},top=${top}`
     );
 
+    // Check if popup was blocked
+    if (!popup || popup.closed || typeof popup.closed === 'undefined') {
+      console.error(`[OAuth] Popup blocked for ${service.name}`);
+      handleServiceError(index, 'Popup was blocked. Please allow popups for this site.');
+      setIsAuthorizing(false);
+      return;
+    }
+
+    console.log(`[OAuth] Popup opened successfully for ${service.name}`);
+
     // Listen for OAuth callback
     const handleMessage = (event: MessageEvent) => {
+      console.log(`[OAuth] Received message:`, event.data);
+      
       if (event.data.type === 'oauth_success' && event.data.service === service.id) {
+        console.log(`[OAuth] Success for ${service.name}`);
         window.removeEventListener('message', handleMessage);
         setIsAuthorizing(false);
         handleServiceSuccess(index);
       } else if (event.data.type === 'oauth_error' && event.data.service === service.id) {
+        console.error(`[OAuth] Error for ${service.name}:`, event.data.error);
         window.removeEventListener('message', handleMessage);
         setIsAuthorizing(false);
         handleServiceError(index, event.data.error || 'Authorization failed');
@@ -143,9 +166,12 @@ export const OAuthFlow = ({ selectedServices, userId, onComplete }: OAuthFlowPro
         window.removeEventListener('message', handleMessage);
         setIsAuthorizing(false);
         
+        console.log(`[OAuth] Popup closed for ${service.name}`);
+        
         // Check if status is still authorizing (not completed)
         const currentStatus = serviceStatuses[index].status;
         if (currentStatus === 'authorizing') {
+          console.warn(`[OAuth] Popup closed without completing auth for ${service.name}`);
           handleServiceError(index, 'Authorization window was closed');
         }
       }
