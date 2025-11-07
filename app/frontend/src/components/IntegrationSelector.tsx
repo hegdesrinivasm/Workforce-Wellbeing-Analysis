@@ -62,10 +62,9 @@ const AVAILABLE_SERVICES: Service[] = [
     id: 'google-sheets',
     name: 'Google Sheets',
     icon: <TableChart sx={{ fontSize: 40, color: '#0F9D58' }} />,
-    description: 'Attendance tracking and data storage (Required)',
+    description: 'Attendance tracking and data storage',
     category: 'attendance',
     oauthRequired: true,
-    mandatory: true,
   },
   {
     id: 'jira',
@@ -106,17 +105,12 @@ export const IntegrationSelector = ({
   onClose,
   onComplete,
 }: IntegrationSelectorProps) => {
-  // Initialize with Google Sheets as mandatory
-  const [selectedServices, setSelectedServices] = useState<string[]>(['google-sheets']);
+  // Initialize with empty selection - all optional now
+  const [selectedServices, setSelectedServices] = useState<string[]>([]);
   const [step, setStep] = useState<'selection' | 'confirmation'>('selection');
 
   const handleToggleService = (serviceId: string) => {
-    // Prevent deselection of mandatory services
-    const service = AVAILABLE_SERVICES.find(s => s.id === serviceId);
-    if (service?.mandatory) {
-      return; // Don't allow toggling mandatory services
-    }
-    
+    // All services are now optional
     setSelectedServices((prev) =>
       prev.includes(serviceId)
         ? prev.filter((id) => id !== serviceId)
@@ -125,16 +119,13 @@ export const IntegrationSelector = ({
   };
 
   const handleContinue = () => {
-    // Google Sheets is mandatory, so there's always at least one service
+    // Allow continuing even with no services selected
     setStep('confirmation');
   };
 
   const handleConfirm = () => {
-    // Ensure Google Sheets is always included
-    const finalServices = selectedServices.includes('google-sheets') 
-      ? selectedServices 
-      : ['google-sheets', ...selectedServices];
-    onComplete(finalServices);
+    // Continue with selected services (can be empty)
+    onComplete(selectedServices);
   };
 
   const handleBack = () => {
@@ -142,8 +133,8 @@ export const IntegrationSelector = ({
   };
 
   const handleSkipAll = () => {
-    // Even when skipping, Google Sheets is mandatory
-    onComplete(['google-sheets']);
+    // Skip all integrations for now - user can add them later in settings
+    onComplete([]);
   };
 
   const selectedServicesData = AVAILABLE_SERVICES.filter((s) =>
@@ -203,16 +194,10 @@ export const IntegrationSelector = ({
           </DialogTitle>
 
           <DialogContent>
-            <Alert severity="info" sx={{ mb: 2 }}>
+            <Alert severity="info" sx={{ mb: 3 }}>
               <Typography variant="body2">
-                <strong>Why we need access:</strong> We analyze your work patterns (meetings, messages, tasks) 
-                to calculate wellbeing scores and detect burnout risks. Your data is encrypted and never shared.
-              </Typography>
-            </Alert>
-
-            <Alert severity="warning" sx={{ mb: 3 }}>
-              <Typography variant="body2">
-                <strong>Note:</strong> Google Sheets integration is required for attendance tracking and cannot be disabled.
+                <strong>You can skip this step!</strong> Connect integrations now for full analytics, 
+                or skip and add them later from your Account Settings whenever you're ready.
               </Typography>
             </Alert>
 
@@ -431,8 +416,12 @@ export const IntegrationSelector = ({
           <Divider />
 
           <DialogActions sx={{ p: 3 }}>
-            <Button onClick={handleSkipAll} color="inherit">
-              Skip Optional Services
+            <Button 
+              onClick={handleSkipAll} 
+              color="inherit"
+              sx={{ fontWeight: 600 }}
+            >
+              Skip for Now
             </Button>
             <Box sx={{ flex: 1 }} />
             <Typography variant="body2" sx={{ color: 'text.secondary', mr: 2 }}>
@@ -441,8 +430,11 @@ export const IntegrationSelector = ({
             <Button
               onClick={handleContinue}
               variant="contained"
+              disabled={selectedServices.length === 0}
               sx={{
-                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                background: selectedServices.length > 0 
+                  ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+                  : undefined,
                 px: 4,
               }}
             >
@@ -536,6 +528,13 @@ export const IntegrationSelector = ({
           <DialogActions sx={{ p: 3 }}>
             <Button onClick={handleBack} color="inherit">
               Back
+            </Button>
+            <Button 
+              onClick={handleSkipAll} 
+              color="secondary"
+              sx={{ fontWeight: 600 }}
+            >
+              Skip for Now
             </Button>
             <Box sx={{ flex: 1 }} />
             <Button
