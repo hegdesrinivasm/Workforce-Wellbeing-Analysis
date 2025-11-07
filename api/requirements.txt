@@ -1,6 +1,7 @@
 # FastAPI and server
 fastapi>=0.104.0
 uvicorn[standard]>=0.24.0
+gunicorn>=21.2.0
 python-multipart
 
 # Database
@@ -39,5 +40,4 @@ joblib
 # Development
 pytest
 pytest-asyncio
-gunicorn>=21.2.0
 pydantic[email]
