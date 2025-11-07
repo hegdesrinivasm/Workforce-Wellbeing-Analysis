@@ -6,7 +6,6 @@ import {
   Card,
   CardContent,
   Button,
-  Grid,
   Chip,
   Alert,
   Divider,
@@ -178,11 +177,10 @@ export const AccountSettings = () => {
             <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 2, color: 'success.main' }}>
               ✓ Connected Services ({connectedIntegrations.length})
             </Typography>
-            <Grid container spacing={2} sx={{ mb: 4 }}>
+            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2, mb: 4 }}>
               {connectedIntegrations.map((integration) => (
-                <Grid item xs={12} md={6} key={integration.id}>
-                  <Card sx={{ border: '2px solid #4caf50' }}>
-                    <CardContent>
+                <Card key={integration.id} sx={{ border: '2px solid #4caf50' }}>
+                  <CardContent>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
                         {integration.icon}
                         <Box sx={{ flex: 1 }}>
@@ -204,16 +202,14 @@ export const AccountSettings = () => {
                         <IconButton
                           color="error"
                           onClick={() => setDisconnectDialog(integration.id)}
-                          size="small"
                         >
                           <Delete />
                         </IconButton>
                       </Box>
                     </CardContent>
                   </Card>
-                </Grid>
               ))}
-            </Grid>
+            </Box>
           </>
         )}
 
@@ -224,11 +220,10 @@ export const AccountSettings = () => {
             <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 2 }}>
               Available Services ({availableIntegrations.length})
             </Typography>
-            <Grid container spacing={2}>
+            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2 }}>
               {availableIntegrations.map((integration) => (
-                <Grid item xs={12} md={6} key={integration.id}>
-                  <Card sx={{ opacity: 0.8 }}>
-                    <CardContent>
+                <Card key={integration.id} sx={{ opacity: 0.8 }}>
+                  <CardContent>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
                         {integration.icon}
                         <Box sx={{ flex: 1 }}>
@@ -250,9 +245,8 @@ export const AccountSettings = () => {
                       </Button>
                     </CardContent>
                   </Card>
-                </Grid>
               ))}
-            </Grid>
+            </Box>
           </>
         )}
       </Box>
