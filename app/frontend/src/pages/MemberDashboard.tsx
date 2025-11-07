@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { WellbeingProfile } from '../components/WellbeingProfile';
 import { NotificationBar } from '../components/NotificationBar';
 import { BurnoutNotificationService } from '../components/BurnoutNotificationService';
+import { ColleagueCheckDialog } from '../components/ColleagueCheckDialog';
 import {
   Box,
   AppBar,
@@ -17,13 +18,14 @@ import {
   Divider,
   Button,
 } from '@mui/material';
-import { Work, Logout, AccountCircle, ArrowBack, Email, Badge, Person } from '@mui/icons-material';
+import { Work, Logout, AccountCircle, ArrowBack, Email, Badge, Person, GroupAdd } from '@mui/icons-material';
 
 export const MemberDashboard = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [showAccount, setShowAccount] = useState(false);
+  const [colleagueDialogOpen, setColleagueDialogOpen] = useState(false);
 
   useEffect(() => {
     // Redirect to login if not authenticated
@@ -87,6 +89,25 @@ export const MemberDashboard = () => {
 
           {/* User Menu */}
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            {/* How's Your Colleague Button */}
+            <Button
+              variant="outlined"
+              startIcon={<GroupAdd />}
+              onClick={() => setColleagueDialogOpen(true)}
+              sx={{
+                color: 'white',
+                borderColor: 'rgba(255, 255, 255, 0.5)',
+                '&:hover': {
+                  borderColor: 'white',
+                  bgcolor: 'rgba(255, 255, 255, 0.1)',
+                },
+                textTransform: 'none',
+                fontWeight: 600,
+              }}
+            >
+              How's Your Colleague?
+            </Button>
+            
             <NotificationBar />
             
             <Avatar
@@ -238,6 +259,12 @@ export const MemberDashboard = () => {
           <WellbeingProfile />
         )}
       </Box>
+      
+      {/* Colleague Check Dialog */}
+      <ColleagueCheckDialog 
+        open={colleagueDialogOpen} 
+        onClose={() => setColleagueDialogOpen(false)} 
+      />
     </Box>
   );
 };

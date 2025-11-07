@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import {
   Box,
   Card,
@@ -9,6 +10,7 @@ import {
   IconButton,
   Breadcrumbs,
   Link,
+  CircularProgress,
 } from '@mui/material';
 import {
   VideoCall,
@@ -21,31 +23,102 @@ import {
   Logout,
   ArrowBack,
 } from '@mui/icons-material';
+import { collection, getDocs, query, where } from 'firebase/firestore';
+import { db } from '../firebase/config';
+import { generateConsistentValue, getTestScenarioValues } from '../utils/consistentValues';
 
 interface MemberDetailProps {
   memberId: number;
   onBack: () => void;
 }
 
+interface MemberData {
+  id: number;
+  name: string;
+  email: string;
+  department: string;
+  meetingHours: number;
+  meetingCount: number;
+  messagesSent: number;
+  messagesReceived: number;
+  taskCompletion: number;
+  loggedHours: number;
+  earlyStarts: number;
+  lateExits: number;
+  lateStarts: number;
+  earlyExits: number;
+}
+
 export const MemberDetail = ({ memberId, onBack }: MemberDetailProps) => {
-  // Mock member data - in production, this would come from backend API based on memberId
-  const memberData = {
-    id: memberId,
-    name: 'Alice Johnson',
-    email: 'alice@company.com',
-    department: 'Engineering',
-    // Productivity metrics
-    meetingHours: 10.5,
-    meetingCount: 15,
-    messagesSent: 198,
-    messagesReceived: 165,
-    taskCompletion: 95,
-    loggedHours: 42,
-    earlyStarts: 4,
-    lateExits: 1,
-    lateStarts: 0,
-    earlyExits: 0,
-  };
+  const [memberData, setMemberData] = useState<MemberData | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchMemberData = async () => {
+      try {
+        setLoading(true);
+        
+        // Fetch all members to find the one with matching index (memberId)
+        const membersRef = collection(db, 'users');
+        const q = query(membersRef, where('role', '==', 'member'));
+        const querySnapshot = await getDocs(q);
+        
+        const members: any[] = [];
+        querySnapshot.forEach((doc) => {
+          members.push({ firebaseId: doc.id, ...doc.data() });
+        });
+        
+        // Get the member at the index (memberId is 1-based)
+        const member = members[memberId - 1];
+        
+        if (member) {
+          const email = member.email || '';
+          const testScenario = getTestScenarioValues(email);
+          
+          setMemberData({
+            id: memberId,
+            name: member.name || 'Unknown',
+            email: email,
+            department: member.department || 'Engineering',
+            meetingHours: member.analytics?.meetingHours ?? generateConsistentValue(email, 5, 8, 15),
+            meetingCount: member.analytics?.meetingCount ?? generateConsistentValue(email, 6, 10, 20),
+            messagesSent: member.analytics?.messagesSent ?? generateConsistentValue(email, 7, 100, 250),
+            messagesReceived: member.analytics?.messagesReceived ?? generateConsistentValue(email, 8, 100, 250),
+            taskCompletion: testScenario?.taskCompletionRate ?? member.analytics?.taskCompletionRate ?? generateConsistentValue(email, 1, 60, 100),
+            loggedHours: member.analytics?.loggedHours ?? generateConsistentValue(email, 2, 30, 45),
+            earlyStarts: member.analytics?.earlyStarts ?? generateConsistentValue(email, 9, 0, 5),
+            lateExits: member.analytics?.lateExits ?? generateConsistentValue(email, 10, 0, 3),
+            lateStarts: member.analytics?.lateStarts ?? generateConsistentValue(email, 11, 0, 2),
+            earlyExits: member.analytics?.earlyExits ?? generateConsistentValue(email, 12, 0, 2),
+          });
+        }
+      } catch (error) {
+        console.error('Error fetching member data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchMemberData();
+  }, [memberId]);
+
+  if (loading) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', p: 8 }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
+
+  if (!memberData) {
+    return (
+      <Box sx={{ maxWidth: 1400, mx: 'auto', p: 3 }}>
+        <Typography variant="h6" sx={{ color: '#7f8c8d' }}>
+          Member not found
+        </Typography>
+      </Box>
+    );
+  }
 
   const efficiencyScore = Math.round(
     (memberData.taskCompletion + Math.max(0, 100 - memberData.meetingCount * 3) + Math.min(100, (memberData.loggedHours / 40) * 100)) / 3

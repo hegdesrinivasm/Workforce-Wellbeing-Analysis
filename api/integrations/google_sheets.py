@@ -33,6 +33,8 @@ class GoogleSheetsOAuth:
         - https://www.googleapis.com/auth/spreadsheets: Read and write access to sheets
         - https://www.googleapis.com/auth/drive.file: Access to created/opened files
         """
+        from urllib.parse import urlencode
+        
         params = {
             "client_id": self.client_id,
             "redirect_uri": self.redirect_uri,
@@ -45,7 +47,7 @@ class GoogleSheetsOAuth:
         if state:
             params["state"] = state
         
-        query_string = "&".join(f"{k}={v}" for k, v in params.items())
+        query_string = urlencode(params)
         return f"{self.AUTHORIZATION_URL}?{query_string}"
     
     async def exchange_code_for_token(self, code: str) -> Dict[str, Any]:

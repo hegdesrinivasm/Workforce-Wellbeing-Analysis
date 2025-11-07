@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 # TEST MODE - Set to False for real OAuth, True for testing
-TEST_MODE = False
+TEST_MODE = True
 
 # OAuth state storage (use Redis in production)
 oauth_states = {}
@@ -173,7 +173,7 @@ async def google_login(user_id: str, state: str = None, db: Session = Depends(ge
         google_oauth = GoogleSheetsOAuth()
         auth_url = google_oauth.get_authorization_url(csrf_state)
         
-        logger.info(f"Redirecting user {user_id} to Google OAuth")
+        logger.info(f"Redirecting user {user_id} to Google OAuth URL: {auth_url}")
         return RedirectResponse(url=auth_url)
     
     except Exception as e:

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { collection, query, where, getDocs } from 'firebase/firestore';
+import { collection, query, where, getDocs, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import { useAuth } from '../context/AuthContext';
 import { generateConsistentValue, getConsistentStressLevel, getConsistentTrend, getConsistentLastActive, getTestScenarioValues } from '../utils/consistentValues';
@@ -38,6 +38,16 @@ interface TeamMember {
   stressLevel: 'low' | 'medium' | 'high';
   trend: 'up' | 'down' | 'stable';
   lastActive: string;
+  firebaseId?: string;
+  colleagueVotes?: {
+    burnoutYes: number;
+    burnoutNo: number;
+    teamworkYes: number;
+    teamworkNo: number;
+    motivationYes: number;
+    motivationNo: number;
+    totalVoters: number;
+  };
 }
 
 interface TeamOverviewProps {
@@ -69,16 +79,71 @@ export const TeamOverview = ({ onViewMember }: TeamOverviewProps) => {
         const querySnapshot = await getDocs(q);
         const members: TeamMember[] = [];
         
+        // Fetch all colleague votes
+        const votesRef = collection(db, 'colleague_votes');
+        const votesSnapshot = await getDocs(votesRef);
+        
+        console.log('Total votes in database:', votesSnapshot.size);
+        
+        // Create a map of colleagueId -> votes
+        const votesMap = new Map<string, any>();
+        votesSnapshot.forEach((doc) => {
+          const voteData = doc.data();
+          console.log('Vote data:', voteData);
+          const colleagueId = voteData.colleagueId;
+          
+          if (!votesMap.has(colleagueId)) {
+            votesMap.set(colleagueId, {
+              burnoutYes: 0,
+              burnoutNo: 0,
+              teamworkYes: 0,
+              teamworkNo: 0,
+              motivationYes: 0,
+              motivationNo: 0,
+              voters: new Set(),
+            });
+          }
+          
+          const votes = votesMap.get(colleagueId);
+          votes.voters.add(voteData.voterId);
+          
+          // Count the votes
+          if (voteData.votes?.burnout === 'yes') votes.burnoutYes++;
+          if (voteData.votes?.burnout === 'no') votes.burnoutNo++;
+          if (voteData.votes?.teamwork === 'yes') votes.teamworkYes++;
+          if (voteData.votes?.teamwork === 'no') votes.teamworkNo++;
+          if (voteData.votes?.motivation === 'yes') votes.motivationYes++;
+          if (voteData.votes?.motivation === 'no') votes.motivationNo++;
+        });
+        
+        console.log('Votes map:', Array.from(votesMap.entries()));
+        
         querySnapshot.forEach((doc) => {
           const data = doc.data();
           const email = data.email || '';
+          const firebaseId = doc.id;
           
           // Check for test scenario values first
           const testScenario = getTestScenarioValues(email);
           
+          // Get colleague votes for this member
+          const memberVotes = votesMap.get(firebaseId);
+          const colleagueVotes = memberVotes ? {
+            burnoutYes: memberVotes.burnoutYes,
+            burnoutNo: memberVotes.burnoutNo,
+            teamworkYes: memberVotes.teamworkYes,
+            teamworkNo: memberVotes.teamworkNo,
+            motivationYes: memberVotes.motivationYes,
+            motivationNo: memberVotes.motivationNo,
+            totalVoters: memberVotes.voters.size,
+          } : undefined;
+          
+          console.log(`Member ${data.name} (${firebaseId}) votes:`, colleagueVotes);
+          
           // Use test scenario, then real data, then fallback to consistent dummy values
           members.push({
             id: members.length + 1,
+            firebaseId,
             name: data.name || 'Unknown',
             email: email,
             taskCompletionRate: testScenario?.taskCompletionRate ?? data.analytics?.taskCompletionRate ?? generateConsistentValue(email, 1, 60, 100),
@@ -88,10 +153,14 @@ export const TeamOverview = ({ onViewMember }: TeamOverviewProps) => {
             stressLevel: testScenario?.stressLevel ?? data.analytics?.stressLevel ?? getConsistentStressLevel(email),
             trend: data.analytics?.trend ?? getConsistentTrend(email),
             lastActive: data.analytics?.lastActive ?? getConsistentLastActive(email),
+            colleagueVotes,
           });
         });
         
         setTeamMembers(members);
+        
+        // Check for members with majority burnout votes and create notifications
+        await checkBurnoutMajority(members, user.id);
       } catch (error) {
         console.error('Error fetching team members:', error);
         // Show empty array on error instead of mock data
@@ -103,6 +172,57 @@ export const TeamOverview = ({ onViewMember }: TeamOverviewProps) => {
 
     fetchTeamMembers();
   }, [user]);
+
+  // Function to check for majority burnout votes and create notifications
+  const checkBurnoutMajority = async (members: TeamMember[], supervisorId: string) => {
+    try {
+      const notificationsRef = collection(db, 'notifications');
+      
+      for (const member of members) {
+        if (member.colleagueVotes && member.colleagueVotes.totalVoters >= 2) {
+          const totalVotes = member.colleagueVotes.burnoutYes + member.colleagueVotes.burnoutNo;
+          const burnoutPercentage = totalVotes > 0 ? (member.colleagueVotes.burnoutYes / totalVotes) * 100 : 0;
+          
+          // If majority (>50%) say burnt out
+          if (burnoutPercentage > 50) {
+            // Check if we already sent this notification recently
+            const recentNotifications = query(
+              notificationsRef,
+              where('userId', '==', supervisorId),
+              where('type', '==', 'colleague_burnout_alert'),
+              where('memberId', '==', member.firebaseId)
+            );
+            
+            const notificationSnapshot = await getDocs(recentNotifications);
+            
+            // Only create notification if we haven't sent one recently
+            if (notificationSnapshot.empty) {
+              await addDoc(notificationsRef, {
+                userId: supervisorId,
+                type: 'colleague_burnout_alert',
+                memberId: member.firebaseId,
+                memberName: member.name,
+                title: 'Colleague Burnout Alert',
+                message: `${member.colleagueVotes.burnoutYes} out of ${member.colleagueVotes.totalVoters} colleagues report that ${member.name} seems burnt out. Please check in with them.`,
+                severity: 'high',
+                read: false,
+                timestamp: serverTimestamp(),
+                metadata: {
+                  burnoutVotes: member.colleagueVotes.burnoutYes,
+                  totalVoters: member.colleagueVotes.totalVoters,
+                  percentage: Math.round(burnoutPercentage),
+                }
+              });
+              
+              console.log(`Created burnout alert for ${member.name}: ${member.colleagueVotes.burnoutYes}/${member.colleagueVotes.totalVoters} votes`);
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error checking burnout majority:', error);
+    }
+  };
 
   if (loading) {
     return (
@@ -323,6 +443,53 @@ export const TeamOverview = ({ onViewMember }: TeamOverviewProps) => {
                   <Typography variant="body2" sx={{ color: '#7f8c8d', mb: 2 }}>
                     {member.email} • Last active: {member.lastActive}
                   </Typography>
+
+                  {/* Colleague Feedback */}
+                  <Box sx={{ mb: 2, p: 1.5, bgcolor: '#f8f9fa', borderRadius: 1 }}>
+                    <Typography variant="caption" sx={{ fontWeight: 700, color: '#7f8c8d', mb: 1, display: 'block' }}>
+                      Colleague Feedback {member.colleagueVotes && member.colleagueVotes.totalVoters > 0 
+                        ? `(${member.colleagueVotes.totalVoters} ${member.colleagueVotes.totalVoters === 1 ? 'vote' : 'votes'})`
+                        : '(No votes yet)'}
+                    </Typography>
+                    {member.colleagueVotes && member.colleagueVotes.totalVoters > 0 ? (
+                      <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+                        <Chip
+                          label={`${member.colleagueVotes.burnoutYes} feel burnt out`}
+                          size="small"
+                          sx={{
+                            bgcolor: member.colleagueVotes.burnoutYes > 0 ? '#e74c3c15' : '#ecf0f1',
+                            color: member.colleagueVotes.burnoutYes > 0 ? '#e74c3c' : '#7f8c8d',
+                            fontWeight: 600,
+                            fontSize: '0.7rem',
+                          }}
+                        />
+                        <Chip
+                          label={`${member.colleagueVotes.teamworkYes} say good teamwork`}
+                          size="small"
+                          sx={{
+                            bgcolor: '#2ecc7115',
+                            color: '#2ecc71',
+                            fontWeight: 600,
+                            fontSize: '0.7rem',
+                          }}
+                        />
+                        <Chip
+                          label={`${member.colleagueVotes.motivationYes} say motivated`}
+                          size="small"
+                          sx={{
+                            bgcolor: '#3498db15',
+                            color: '#3498db',
+                            fontWeight: 600,
+                            fontSize: '0.7rem',
+                          }}
+                        />
+                      </Box>
+                    ) : (
+                      <Typography variant="caption" sx={{ color: '#95a5a6', fontStyle: 'italic' }}>
+                        No colleague feedback submitted yet. Members can submit feedback using "How's Your Colleague?" button.
+                      </Typography>
+                    )}
+                  </Box>
 
                   {/* Metrics Grid */}
                   <Box
