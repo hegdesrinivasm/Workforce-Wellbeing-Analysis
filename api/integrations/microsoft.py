@@ -16,7 +16,7 @@ class MicrosoftGraphOAuth:
         self.client_id = settings.MICROSOFT_CLIENT_ID
         self.client_secret = settings.MICROSOFT_CLIENT_SECRET
         self.tenant_id = settings.MICROSOFT_TENANT_ID
-        self.redirect_uri = settings.MICROSOFT_REDIRECT_URI
+        self.redirect_uri = settings.get_redirect_uri("microsoft")
         self.scopes = settings.MICROSOFT_SCOPES
         
         self.authority = f"{settings.MICROSOFT_AUTHORITY}/{self.tenant_id}"
