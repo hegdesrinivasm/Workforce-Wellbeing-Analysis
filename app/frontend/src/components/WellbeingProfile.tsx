@@ -18,8 +18,70 @@ import {
   Login,
   Logout,
 } from '@mui/icons-material';
+import { useAuth } from '../context/AuthContext';
+
+interface UserAnalytics {
+  taskCompletionRate?: number;
+  loggedHours?: number;
+  wellbeingScore?: number;
+  meetingHours?: number;
+  meetingCount?: number;
+  messagesSent?: number;
+  messagesReceived?: number;
+  earlyStarts?: number;
+  lateExits?: number;
+  lateStarts?: number;
+  earlyExits?: number;
+  burnoutRisk?: number;
+  efficiency?: number;
+  stressLevel?: 'low' | 'medium' | 'high';
+  trend?: 'up' | 'down' | 'stable';
+  lastActive?: string;
+}
 
 export const WellbeingProfile = () => {
+  const { user } = useAuth();
+  
+  // Generate consistent dummy values based on email hash (same as TeamOverview)
+  const generateConsistentValue = (email: string, seed: number, min: number, max: number): number => {
+    let hash = 0;
+    const str = email + seed.toString();
+    for (let i = 0; i < str.length; i++) {
+      hash = ((hash << 5) - hash) + str.charCodeAt(i);
+      hash = hash & hash;
+    }
+    return min + (Math.abs(hash) % (max - min + 1));
+  };
+
+  const email = user?.email || '';
+  
+  // TODO: Fetch real analytics data from Firestore
+  // For now, use consistent dummy values based on email
+  const getUserAnalytics = (): UserAnalytics | null => {
+    // In the future, this would fetch from Firestore: doc(db, 'analytics', user.id)
+    // For now, return null to use dummy values
+    return null;
+  };
+  
+  const analytics = getUserAnalytics();
+  
+  // Use real data if available, otherwise generate consistent dummy values
+  const taskCompletionRate = analytics?.taskCompletionRate ?? generateConsistentValue(email, 1, 60, 100);
+  const loggedHours = analytics?.loggedHours ?? generateConsistentValue(email, 2, 30, 45);
+  const wellbeingScore = analytics?.wellbeingScore ?? generateConsistentValue(email, 3, 50, 90);
+  const meetingHours = analytics?.meetingHours ?? generateConsistentValue(email, 5, 8, 18);
+  const meetingCount = analytics?.meetingCount ?? generateConsistentValue(email, 6, 12, 25);
+  const messagesSent = analytics?.messagesSent ?? generateConsistentValue(email, 7, 150, 300);
+  const messagesReceived = analytics?.messagesReceived ?? generateConsistentValue(email, 8, 120, 250);
+  const earlyStarts = analytics?.earlyStarts ?? generateConsistentValue(email, 9, 0, 4);
+  const lateExits = analytics?.lateExits ?? generateConsistentValue(email, 10, 0, 3);
+  const lateStarts = analytics?.lateStarts ?? generateConsistentValue(email, 11, 0, 2);
+  const earlyExits = analytics?.earlyExits ?? generateConsistentValue(email, 12, 0, 1);
+  
+  // Calculate burnout risk and efficiency based on other metrics
+  const burnoutRisk = analytics?.burnoutRisk ?? Math.min(100, Math.max(0, 100 - wellbeingScore + (meetingHours > 15 ? 20 : 0)));
+  const efficiency = analytics?.efficiency ?? Math.round((taskCompletionRate + Math.min(100, (loggedHours / 40) * 100)) / 2);
+
   return (
     <Box sx={{ maxWidth: 1400, mx: 'auto', p: 3 }}>
       {/* Score Cards - Square boxes with circular progress */}
@@ -38,7 +100,7 @@ export const WellbeingProfile = () => {
               <Box sx={{ position: 'relative', display: 'inline-flex', mb: 2 }}>
                 <CircularProgress
                   variant="determinate"
-                  value={72}
+                  value={wellbeingScore}
                   size={120}
                   thickness={4}
                   sx={{
@@ -60,8 +122,8 @@ export const WellbeingProfile = () => {
                     justifyContent: 'center',
                   }}
                 >
-                  <Typography variant="h4" component="div" sx={{ fontWeight: 700, color: '#f093fb' }}>
-                    72%
+                                    <Typography variant="h4" sx={{ fontWeight: 700, color: '#f093fb' }}>
+                    {wellbeingScore}
                   </Typography>
                 </Box>
               </Box>
@@ -82,7 +144,7 @@ export const WellbeingProfile = () => {
               <Box sx={{ position: 'relative', display: 'inline-flex', mb: 2 }}>
                 <CircularProgress
                   variant="determinate"
-                  value={35}
+                  value={burnoutRisk}
                   size={120}
                   thickness={4}
                   sx={{
@@ -104,8 +166,8 @@ export const WellbeingProfile = () => {
                     justifyContent: 'center',
                   }}
                 >
-                  <Typography variant="h4" component="div" sx={{ fontWeight: 700, color: '#fa709a' }}>
-                    35%
+                  <Typography variant="h4" sx={{ fontWeight: 700, color: '#fa709a' }}>
+                    {burnoutRisk}
                   </Typography>
                 </Box>
               </Box>
@@ -113,7 +175,7 @@ export const WellbeingProfile = () => {
                 Burnout Risk Score
               </Typography>
               <Typography variant="body2" sx={{ color: 'text.secondary', textAlign: 'center' }}>
-                Low risk - Your current workload and stress levels are manageable
+                {burnoutRisk < 40 ? 'Low risk - Your current workload and stress levels are manageable' : burnoutRisk < 70 ? 'Moderate risk - Consider balancing your workload' : 'High risk - Please take care of your wellbeing'}
               </Typography>
             </Box>
           </CardContent>
@@ -126,7 +188,7 @@ export const WellbeingProfile = () => {
               <Box sx={{ position: 'relative', display: 'inline-flex', mb: 2 }}>
                 <CircularProgress
                   variant="determinate"
-                  value={78}
+                  value={efficiency}
                   size={120}
                   thickness={4}
                   sx={{
@@ -148,8 +210,8 @@ export const WellbeingProfile = () => {
                     justifyContent: 'center',
                   }}
                 >
-                  <Typography variant="h4" component="div" sx={{ fontWeight: 700, color: '#667eea' }}>
-                    78%
+                  <Typography variant="h4" sx={{ fontWeight: 700, color: '#667eea' }}>
+                    {efficiency}
                   </Typography>
                 </Box>
               </Box>
@@ -157,7 +219,7 @@ export const WellbeingProfile = () => {
                 Overall Efficiency Score
               </Typography>
               <Typography variant="body2" sx={{ color: 'text.secondary', textAlign: 'center' }}>
-                Based on task completion, meeting time, and logged hours
+                Based on task completion and logged hours
               </Typography>
             </Box>
           </CardContent>
@@ -179,7 +241,7 @@ export const WellbeingProfile = () => {
           {[
             {
               title: 'Meeting Hours',
-              value: 12.5,
+              value: meetingHours,
               unit: 'hrs/week',
               icon: <VideoCall />,
               color: '#3498db',
@@ -188,7 +250,7 @@ export const WellbeingProfile = () => {
             },
             {
               title: 'Meeting Count',
-              value: 18,
+              value: meetingCount,
               unit: 'meetings/week',
               icon: <VideoCall />,
               color: '#e74c3c',
@@ -197,7 +259,7 @@ export const WellbeingProfile = () => {
             },
             {
               title: 'Messages Sent',
-              value: 245,
+              value: messagesSent,
               unit: 'msgs/week',
               icon: <Chat />,
               color: '#2ecc71',
@@ -206,7 +268,7 @@ export const WellbeingProfile = () => {
             },
             {
               title: 'Messages Received',
-              value: 187,
+              value: messagesReceived,
               unit: 'msgs/week',
               icon: <Chat />,
               color: '#f39c12',
@@ -215,7 +277,7 @@ export const WellbeingProfile = () => {
             },
             {
               title: 'Task Completion',
-              value: 92,
+              value: taskCompletionRate,
               unit: '%',
               icon: <Assignment />,
               color: '#9b59b6',
@@ -224,7 +286,7 @@ export const WellbeingProfile = () => {
             },
             {
               title: 'Logged Hours',
-              value: 38.5,
+              value: loggedHours,
               unit: 'hrs/week',
               icon: <AccessTime />,
               color: '#1abc9c',
@@ -233,7 +295,7 @@ export const WellbeingProfile = () => {
             },
             {
               title: 'Early Starts',
-              value: 3,
+              value: earlyStarts,
               unit: 'days/week',
               icon: <Login />,
               color: '#27ae60',
@@ -242,7 +304,7 @@ export const WellbeingProfile = () => {
             },
             {
               title: 'Late Exits',
-              value: 2,
+              value: lateExits,
               unit: 'days/week',
               icon: <Logout />,
               color: '#16a085',
@@ -251,7 +313,7 @@ export const WellbeingProfile = () => {
             },
             {
               title: 'Late Starts',
-              value: 1,
+              value: lateStarts,
               unit: 'days/week',
               icon: <TrendingUp />,
               color: '#e67e22',
@@ -260,7 +322,7 @@ export const WellbeingProfile = () => {
             },
             {
               title: 'Early Exits',
-              value: 0,
+              value: earlyExits,
               unit: 'days/week',
               icon: <Speed />,
               color: '#c0392b',

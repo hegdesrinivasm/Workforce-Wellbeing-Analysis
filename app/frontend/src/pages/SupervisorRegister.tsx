@@ -43,8 +43,17 @@ const validateName = (name: string): { valid: boolean; error?: string } => {
   if (name.length > 120) {
     return { valid: false, error: 'Name cannot exceed 120 characters' };
   }
-  if (!/^[a-zA-Z\s\-']+$/.test(name)) {
-    return { valid: false, error: 'Name can only contain letters, spaces, hyphens, and apostrophes' };
+  // Must start with a letter
+  if (!/^[a-zA-Z]/.test(name)) {
+    return { valid: false, error: 'Name must start with a letter' };
+  }
+  // Can't be all numbers
+  if (/^\d+$/.test(name.trim())) {
+    return { valid: false, error: 'Name cannot be only numbers' };
+  }
+  // Can contain letters, numbers, spaces, hyphens, and apostrophes
+  if (!/^[a-zA-Z][a-zA-Z0-9\s\-']*$/.test(name)) {
+    return { valid: false, error: 'Name can only contain letters, numbers, spaces, hyphens, and apostrophes' };
   }
   return { valid: true };
 };
@@ -68,6 +77,7 @@ export const SupervisorRegister = () => {
     email: '',
     password: '',
     confirmPassword: '',
+    teamNumber: '',
     phone: '',
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -157,6 +167,7 @@ export const SupervisorRegister = () => {
         name: formData.name.trim(),
         email: formData.email.trim(),
         role: 'supervisor',
+        teamNumber: formData.teamNumber.trim() || '1',
         phone: formData.phone.trim(),
         createdAt: new Date().toISOString(),
       });
@@ -262,6 +273,17 @@ export const SupervisorRegister = () => {
                   variant="outlined"
                   error={!!errors['email']}
                   helperText={errors['email']}
+                />
+
+                <TextField
+                  label="Team Number"
+                  name="teamNumber"
+                  value={formData.teamNumber}
+                  onChange={handleChange}
+                  placeholder="e.g., 1, 2, 3, 4"
+                  fullWidth
+                  disabled={loading}
+                  variant="outlined"
                 />
 
                 <TextField

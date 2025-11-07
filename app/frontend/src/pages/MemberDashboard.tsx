@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { WellbeingProfile } from '../components/WellbeingProfile';
+import { NotificationBar } from '../components/NotificationBar';
 import {
   Box,
   AppBar,
@@ -82,6 +83,8 @@ export const MemberDashboard = () => {
 
           {/* User Menu */}
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <NotificationBar />
+            
             <Avatar
               sx={{
                 width: 36,
@@ -208,6 +211,18 @@ export const MemberDashboard = () => {
                       </Typography>
                       <Typography variant="body1" sx={{ fontWeight: 600, textTransform: 'capitalize' }}>
                         {user.role}
+                      </Typography>
+                    </Box>
+                  </Box>
+
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                    <Work sx={{ color: 'text.secondary' }} />
+                    <Box>
+                      <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                        Team Number
+                      </Typography>
+                      <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                        {(user as any).teamNumber || '1'}
                       </Typography>
                     </Box>
                   </Box>
