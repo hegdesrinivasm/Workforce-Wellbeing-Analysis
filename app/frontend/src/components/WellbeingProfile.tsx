@@ -18,7 +18,6 @@ import {
   Logout,
 } from '@mui/icons-material';
 import { useAuth } from '../context/AuthContext';
-import { BurnoutAlerts } from './BurnoutAlerts';
 
 interface UserAnalytics {
   taskCompletionRate?: number;
@@ -554,11 +553,6 @@ export const WellbeingProfile = () => {
           245 messages sent - actively engaging with your team
         </Typography>
       </Paper>
-    </Box>
-
-    {/* Burnout Alerts Section */}
-    <Box sx={{ mt: 4 }}>
-      <BurnoutAlerts />
     </Box>
   </Box>
 </Box>
