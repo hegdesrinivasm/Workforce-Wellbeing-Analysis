@@ -19,10 +19,13 @@ import {
   CheckCircle,
   Delete,
 } from '@mui/icons-material';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { collection, query, where, getDocs, deleteDoc, doc, updateDoc } from 'firebase/firestore';
+import { db } from '../firebase/config';
+import { useAuth } from '../context/AuthContext';
 
 interface Notification {
-  id: number;
+  id: string;
   message: string;
   severity: 'error' | 'warning' | 'info' | 'success';
   timestamp: string;
@@ -30,25 +33,94 @@ interface Notification {
 }
 
 export const NotificationBar = () => {
+  const { user } = useAuth();
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
-  const [notifications, setNotifications] = useState<Notification[]>([
-    // Empty by default - can be populated later
-  ]);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+
+  // Fetch notifications from Firestore
+  useEffect(() => {
+    const fetchNotifications = async () => {
+      if (!user) return;
+
+      try {
+        const notificationsRef = collection(db, 'notifications');
+        const q = query(notificationsRef, where('userId', '==', user.id));
+        const querySnapshot = await getDocs(q);
+        
+        const fetchedNotifications: Notification[] = [];
+        querySnapshot.forEach((docSnap) => {
+          const data = docSnap.data();
+          fetchedNotifications.push({
+            id: docSnap.id,
+            message: data.message || '',
+            severity: data.severity || 'info',
+            timestamp: data.timestamp ? new Date(data.timestamp).toLocaleString() : 'Just now',
+            read: data.read || false,
+          });
+        });
+        
+        // Sort by timestamp (newest first)
+        fetchedNotifications.sort((a, b) => 
+          new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+        );
+        
+        setNotifications(fetchedNotifications);
+      } catch (error) {
+        console.error('Error fetching notifications:', error);
+      }
+    };
+
+    fetchNotifications();
+    
+    // Poll for new notifications every 30 seconds
+    const interval = setInterval(fetchNotifications, 30000);
+    
+    return () => clearInterval(interval);
+  }, [user]);
 
   const unreadCount = notifications.filter(n => !n.read).length;
 
-  const handleClick = (event: React.MouseEvent<HTMLElement>) => {
+  const handleClick = async (event: React.MouseEvent<HTMLElement>) => {
     setAnchorEl(event.currentTarget);
-    // Mark all as read when opened
-    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+    
+    // Mark all as read in Firestore
+    try {
+      const unreadNotifications = notifications.filter(n => !n.read);
+      for (const notification of unreadNotifications) {
+        await updateDoc(doc(db, 'notifications', notification.id), {
+          read: true,
+        });
+      }
+      // Update local state
+      setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+    } catch (error) {
+      console.error('Error marking notifications as read:', error);
+    }
   };
 
   const handleClose = () => {
     setAnchorEl(null);
   };
 
-  const handleDelete = (id: number) => {
-    setNotifications(prev => prev.filter(n => n.id !== id));
+  const handleDelete = async (id: string) => {
+    try {
+      await deleteDoc(doc(db, 'notifications', id));
+      setNotifications(prev => prev.filter(n => n.id !== id));
+    } catch (error) {
+      console.error('Error deleting notification:', error);
+    }
+  };
+
+  const handleClearAll = async () => {
+    try {
+      for (const notification of notifications) {
+        await deleteDoc(doc(db, 'notifications', notification.id));
+      }
+      setNotifications([]);
+      handleClose();
+    } catch (error) {
+      console.error('Error clearing notifications:', error);
+    }
   };
 
   const getSeverityIcon = (severity: string) => {
@@ -188,10 +260,7 @@ export const NotificationBar = () => {
           <>
             <Divider />
             <MenuItem
-              onClick={() => {
-                setNotifications([]);
-                handleClose();
-              }}
+              onClick={handleClearAll}
               sx={{
                 justifyContent: 'center',
                 color: '#e74c3c',

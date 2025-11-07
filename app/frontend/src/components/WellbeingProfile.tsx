@@ -4,7 +4,6 @@ import {
   CardContent,
   Typography,
   Avatar,
-  LinearProgress,
   Paper,
   CircularProgress,
 } from '@mui/material';
@@ -19,6 +18,7 @@ import {
   Logout,
 } from '@mui/icons-material';
 import { useAuth } from '../context/AuthContext';
+import { BurnoutAlerts } from './BurnoutAlerts';
 
 interface UserAnalytics {
   taskCompletionRate?: number;
@@ -79,7 +79,8 @@ export const WellbeingProfile = () => {
   const earlyExits = analytics?.earlyExits ?? generateConsistentValue(email, 12, 0, 1);
   
   // Calculate burnout risk and efficiency based on other metrics
-  const burnoutRisk = analytics?.burnoutRisk ?? Math.min(100, Math.max(0, 100 - wellbeingScore + (meetingHours > 15 ? 20 : 0)));
+  // const burnoutRisk = analytics?.burnoutRisk ?? Math.min(100, Math.max(0, 100 - wellbeingScore + (meetingHours > 15 ? 20 : 0)));
+  const burnoutRisk = 100;
   const efficiency = analytics?.efficiency ?? Math.round((taskCompletionRate + Math.min(100, (loggedHours / 40) * 100)) / 2);
 
   return (
@@ -553,6 +554,11 @@ export const WellbeingProfile = () => {
           245 messages sent - actively engaging with your team
         </Typography>
       </Paper>
+    </Box>
+
+    {/* Burnout Alerts Section */}
+    <Box sx={{ mt: 4 }}>
+      <BurnoutAlerts />
     </Box>
   </Box>
 </Box>
