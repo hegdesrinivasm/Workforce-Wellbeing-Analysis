@@ -133,8 +133,8 @@ export const IntegrationSelector = ({
   };
 
   const handleSkipAll = () => {
-    // Skip all integrations for now - user can add them later in settings
-    onComplete([]);
+    // Even when skipping, Google Sheets is mandatory
+    onComplete(['google-sheets']);
   };
 
   const selectedServicesData = AVAILABLE_SERVICES.filter((s) =>
@@ -416,12 +416,8 @@ export const IntegrationSelector = ({
           <Divider />
 
           <DialogActions sx={{ p: 3 }}>
-            <Button 
-              onClick={handleSkipAll} 
-              color="inherit"
-              sx={{ fontWeight: 600 }}
-            >
-              Skip for Now
+            <Button onClick={handleSkipAll} color="inherit">
+              Skip Optional Services
             </Button>
             <Box sx={{ flex: 1 }} />
             <Typography variant="body2" sx={{ color: 'text.secondary', mr: 2 }}>

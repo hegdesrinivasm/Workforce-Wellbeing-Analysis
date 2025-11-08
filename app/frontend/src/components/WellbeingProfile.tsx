@@ -8,7 +8,6 @@ import {
   CircularProgress,
   Chip,
   Alert,
-  Snackbar,
 } from '@mui/material';
 import {
   VideoCall,
@@ -25,9 +24,6 @@ import {
   fetchPredictions, 
   PipelineResponse,
   burnoutRiskToPercentage,
-  getBurnoutColor,
-  getWellbeingColor,
-  getEfficiencyColor
 } from '../services/pipelineService';
 
 interface UserAnalytics {
