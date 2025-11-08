@@ -18,7 +18,8 @@ class Settings(BaseSettings):
     # Server
     HOST: str = "0.0.0.0"
     PORT: int = 8000
-    BASE_URL: str = "http://localhost:8000"  # Override in production
+    BASE_URL: str = os.getenv("BASE_URL", "http://localhost:8000")  # Auto-detect in production
+    FRONTEND_URL: str = os.getenv("FRONTEND_URL", "http://localhost:5173")  # Frontend URL for redirects
     
     # Database
     DATABASE_URL: str = "postgresql://user:password@localhost:5432/wellbeing_db"
@@ -30,12 +31,19 @@ class Settings(BaseSettings):
     ENCRYPTION_KEY: str = ""  # Fernet key for token encryption
     
     # CORS
-    CORS_ORIGINS: str = "http://localhost:3000,http://localhost:3001,http://127.0.0.1:3000,http://localhost:5173"
+    CORS_ORIGINS: str = os.getenv(
+        "CORS_ORIGINS",
+        "http://localhost:3000,http://localhost:3001,http://127.0.0.1:3000,http://localhost:5173"
+    )
     
     @property
     def cors_origins_list(self) -> List[str]:
-        """Parse CORS origins from comma-separated string"""
-        return [origin.strip() for origin in self.CORS_ORIGINS.split(",")]
+        """Parse CORS origins from comma-separated string, include frontend URL"""
+        origins = [origin.strip() for origin in self.CORS_ORIGINS.split(",")]
+        # Add frontend URL if not already in the list
+        if self.FRONTEND_URL and self.FRONTEND_URL not in origins:
+            origins.append(self.FRONTEND_URL)
+        return origins
     
     # Microsoft Graph OAuth2
     MICROSOFT_CLIENT_ID: str = ""

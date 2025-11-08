@@ -82,6 +82,10 @@ export async function fetchPredictions(
   daysBack: number = 14
 ): Promise<PipelineResponse> {
   try {
+    // Add timeout to prevent hanging
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+    
     const response = await fetch(
       `${API_BASE_URL}/pipeline/predict?user_id=${userId}&days_back=${daysBack}&${providers.map(p => `providers=${p}`).join('&')}`,
       {
@@ -90,8 +94,11 @@ export async function fetchPredictions(
           'Content-Type': 'application/json',
         },
         credentials: 'include',
+        signal: controller.signal,
       }
     );
+
+    clearTimeout(timeoutId);
 
     if (!response.ok) {
       throw new Error(`Pipeline API error: ${response.statusText}`);
@@ -100,7 +107,11 @@ export async function fetchPredictions(
     const data = await response.json();
     return data;
   } catch (error) {
-    console.error('Error fetching predictions:', error);
+    if (error instanceof Error && error.name === 'AbortError') {
+      console.error('Pipeline API request timed out');
+    } else {
+      console.error('Error fetching predictions:', error);
+    }
     throw error;
   }
 }
